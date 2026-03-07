@@ -1,0 +1,60 @@
+# publish.yml — iil-researchfw PyPI publish via OIDC Trusted Publishing
+#
+# RELEASE WORKFLOW:
+#   git tag iil-researchfw@0.1.0
+#   git push origin iil-researchfw@0.1.0
+#   → CI builds + publishes to PyPI (zero tokens needed)
+#
+# PyPI Trusted Publisher config:
+#   Repository: achimdehnert/researchfw
+#   Workflow:   publish.yml
+#   Environment: pypi
+
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "iil-researchfw@*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Determine version from tag
+        id: pkg
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#*@}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing iil-researchfw v$VERSION"
+
+      - name: Set version in pyproject.toml
+        run: |
+          uv version "${{ steps.pkg.outputs.version }}"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build
+        run: uv build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
