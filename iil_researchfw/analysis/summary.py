@@ -1,6 +1,7 @@
 """AI-powered research summary — LLM-agnostic via Protocol injection."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any
@@ -58,19 +59,24 @@ def make_together_llm(
     async def _call(prompt: str, max_tokens: int = 500, **_: Any) -> str:
         if not key:
             return ""
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                "https://api.together.xyz/v1/chat/completions",
-                headers={"Authorization": f"Bearer {key}"},
-                json={
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": max_tokens,
-                    "temperature": 0.4,
-                },
-            )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"].strip()
+        for attempt in range(3):
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    "https://api.together.xyz/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {key}"},
+                    json={
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": max_tokens,
+                        "temperature": 0.4,
+                    },
+                )
+                if resp.status_code == 429:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                resp.raise_for_status()
+                return resp.json()["choices"][0]["message"]["content"].strip()
+        return ""
 
     return _call  # type: ignore[return-value]
 
