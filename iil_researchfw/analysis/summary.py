@@ -2,11 +2,77 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
+
+import httpx
 
 from iil_researchfw.core.protocols import LLMCallable
 
 logger = logging.getLogger(__name__)
+
+_STYLE_INSTRUCTIONS: dict[str, str] = {
+    # Original styles
+    "academic": "formal academic style with citations",
+    "executive": "executive summary, 3-5 bullet points",
+    "bullet_points": "structured bullet points with headers",
+    # Research-level styles
+    "simple": (
+        "Beantworte auf Deutsch in einfacher, allgemeinverständlicher Sprache. "
+        "Vermeide Fachbegriffe. Schreibe so, dass ein interessierter Laie alles versteht. "
+        "Maximal 150 Wörter."
+    ),
+    "medium": (
+        "Beantworte auf Deutsch prägnant für einen informierten Leser mit allgemeinem "
+        "Hintergrundwissen. Hebe die wichtigsten Erkenntnisse und Zusammenhänge hervor. "
+        "Maximal 200 Wörter."
+    ),
+    "complex": (
+        "Erstelle auf Deutsch eine detaillierte Zusammenfassung für ein Fachpublikum. "
+        "Gehe auf Nuancen, Widersprüche und offene Fragen ein. "
+        "Struktur: Haupterkenntnisse — Kontext — Kritische Einordnung. Maximal 300 Wörter."
+    ),
+    "scientific": (
+        "Erstelle eine wissenschaftliche Zusammenfassung auf Deutsch im Stil eines Abstract. "
+        "Formuliere präzise, objektiv und mit korrekter Fachterminologie. "
+        "Struktur: Fragestellung — Methodik/Quellen — Ergebnisse — Schlussfolgerung. "
+        "Zitiere relevante Quellen nach Titel. Maximal 350 Wörter."
+    ),
+}
+
+
+def make_together_llm(
+    api_key: str | None = None,
+    model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+) -> LLMCallable:
+    """
+    Factory: returns an async LLMCallable backed by Together AI.
+
+    Usage::
+
+        llm = make_together_llm(api_key=os.environ["TOGETHER_API_KEY"])
+        service = AISummaryService(llm_fn=llm)
+    """
+    key = api_key or os.environ.get("TOGETHER_API_KEY", "")
+
+    async def _call(prompt: str, max_tokens: int = 500, **_: Any) -> str:
+        if not key:
+            return ""
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "https://api.together.xyz/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}"},
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": max_tokens,
+                    "temperature": 0.4,
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"].strip()
+
+    return _call  # type: ignore[return-value]
 
 
 class AISummaryService:
@@ -24,9 +90,13 @@ class AISummaryService:
         self,
         findings: list[dict[str, Any]],
         max_length: int = 500,
-        style: str = "academic",
+        style: str = "medium",
     ) -> dict[str, Any]:
-        """Summarize research findings. Styles: academic, executive, bullet_points."""
+        """Summarize research findings.
+
+        Styles: simple, medium, complex, scientific (research levels)
+        or: academic, executive, bullet_points (classic styles).
+        """
         if not findings:
             return {"summary": "", "key_points": [], "ai_generated": False}
         if self._llm_fn:
@@ -86,11 +156,7 @@ class AISummaryService:
     ) -> dict[str, Any]:
         if self._llm_fn is None:
             return self._extractive_summarize(findings)
-        style_instruction = {
-            "academic": "formal academic style with citations",
-            "executive": "executive summary, 3-5 bullet points",
-            "bullet_points": "structured bullet points with headers",
-        }.get(style, "clear and concise")
+        style_instruction = _STYLE_INSTRUCTIONS.get(style, _STYLE_INSTRUCTIONS["medium"])
         content = "\n".join(
             f"- {f.get('title', '')}: {f.get('content', '')[:200]}" for f in findings[:20]
         )

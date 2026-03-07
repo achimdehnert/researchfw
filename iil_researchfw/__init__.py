@@ -2,7 +2,7 @@
 
 __version__ = "0.1.0"
 
-from iil_researchfw.analysis.summary import AISummaryService
+from iil_researchfw.analysis.summary import AISummaryService, make_together_llm
 from iil_researchfw.citations.formatter import CitationService, CitationStyle
 from iil_researchfw.core.models import Finding, ResearchContext, ResearchOutput, Source
 from iil_researchfw.core.service import ResearchService
@@ -21,5 +21,6 @@ __all__ = [
     "CitationService",
     "CitationStyle",
     "AISummaryService",
+    "make_together_llm",
     "ResearchExportService",
 ]
