@@ -17,27 +17,51 @@ _STYLE_INSTRUCTIONS: dict[str, str] = {
     "academic": "formal academic style with citations",
     "executive": "executive summary, 3-5 bullet points",
     "bullet_points": "structured bullet points with headers",
-    # Research-level styles
+    # Research-level styles — enforce markdown structure
     "simple": (
-        "Beantworte auf Deutsch in einfacher, allgemeinverständlicher Sprache. "
-        "Vermeide Fachbegriffe. Schreibe so, dass ein interessierter Laie alles versteht. "
-        "Maximal 150 Wörter."
+        "Schreibe auf Deutsch in einfacher, allgemeinverständlicher Sprache für einen "
+        "interessierten Laien. Vermeide Fachbegriffe.\n\n"
+        "Format — gib NUR dieses Markdown aus, keine Einleitung:\n"
+        "**Was wurde herausgefunden?**\n"
+        "Ein kurzer Satz als Einstieg.\n\n"
+        "**Die wichtigsten Punkte:**\n"
+        "- Punkt 1\n- Punkt 2\n- Punkt 3\n\n"
+        "**Was bedeutet das?**\n"
+        "Ein abschließender Satz in einfacher Sprache. Maximal 120 Wörter gesamt."
     ),
     "medium": (
-        "Beantworte auf Deutsch prägnant für einen informierten Leser mit allgemeinem "
-        "Hintergrundwissen. Hebe die wichtigsten Erkenntnisse und Zusammenhänge hervor. "
-        "Maximal 200 Wörter."
+        "Schreibe auf Deutsch für einen informierten Leser mit allgemeinem Hintergrundwissen.\n\n"
+        "Format — gib NUR dieses Markdown aus, keine Einleitung:\n"
+        "**Kernaussage**\n"
+        "1-2 Sätze zur zentralen Erkenntnis.\n\n"
+        "**Wichtigste Erkenntnisse**\n"
+        "- Erkenntnis 1\n- Erkenntnis 2\n- Erkenntnis 3\n\n"
+        "**Einordnung**\n"
+        "1-2 Sätze zur Bedeutung und zu offenen Fragen. Maximal 180 Wörter gesamt."
     ),
     "complex": (
-        "Erstelle auf Deutsch eine detaillierte Zusammenfassung für ein Fachpublikum. "
-        "Gehe auf Nuancen, Widersprüche und offene Fragen ein. "
-        "Struktur: Haupterkenntnisse — Kontext — Kritische Einordnung. Maximal 300 Wörter."
+        "Schreibe auf Deutsch für ein Fachpublikum. Gehe auf Nuancen und Widersprüche ein.\n\n"
+        "Format — gib NUR dieses Markdown aus, keine Einleitung:\n"
+        "**Haupterkenntnisse**\n"
+        "2-3 Sätze zu den zentralen Befunden.\n\n"
+        "**Detailanalyse**\n"
+        "- Aspekt 1 mit Kontext\n- Aspekt 2 mit Kontext\n- Aspekt 3 mit Kontext\n\n"
+        "**Kritische Einordnung**\n"
+        "Widersprüche, Limitationen oder offene Forschungsfragen.\n\n"
+        "**Fazit**\n"
+        "Schlussfolgerung in 1-2 Sätzen. Maximal 280 Wörter gesamt."
     ),
     "scientific": (
-        "Erstelle eine wissenschaftliche Zusammenfassung auf Deutsch im Stil eines Abstract. "
-        "Formuliere präzise, objektiv und mit korrekter Fachterminologie. "
-        "Struktur: Fragestellung — Methodik/Quellen — Ergebnisse — Schlussfolgerung. "
-        "Zitiere relevante Quellen nach Titel. Maximal 350 Wörter."
+        "Schreibe auf Deutsch eine wissenschaftliche Zusammenfassung im Abstract-Stil.\n\n"
+        "Format — gib NUR dieses Markdown aus, keine Einleitung:\n"
+        "**Fragestellung**\n"
+        "Forschungsfrage und Relevanz.\n\n"
+        "**Methodik & Quellen**\n"
+        "Datengrundlage und verwendete Quellen.\n\n"
+        "**Ergebnisse**\n"
+        "- Befund 1\n- Befund 2\n- Befund 3\n\n"
+        "**Schlussfolgerung**\n"
+        "Wissenschaftliche Einordnung und Implikationen. Maximal 320 Wörter gesamt."
     ),
 }
 
