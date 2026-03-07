@@ -12,6 +12,24 @@ from iil_researchfw.core.protocols import LLMCallable
 
 logger = logging.getLogger(__name__)
 
+# Citation style additions for scientific summaries
+_CITATION_INSTRUCTIONS: dict[str, str] = {
+    "none": "",
+    "inline": (
+        "Zitiere Quellen direkt im Text als Kurzreferenz in eckigen Klammern, "
+        "z.B. [Smith 2023] oder [arXiv:2401.12345]. "
+        "Füge KEINE separate Literaturliste hinzu."
+    ),
+    "bibliography": (
+        "Verwende keine Inline-Zitate im Fließtext. "
+        "Füge am Ende einen Abschnitt **Literatur** hinzu mit nummerierten Einträgen:\n"
+        "[1] Titel — Autoren (Jahr) — Quelle/DOI\n"
+        "[2] ...\n"
+        "Referenziere im Text nur mit Nummern wie [1], [2]."
+    ),
+}
+
+
 _STYLE_INSTRUCTIONS: dict[str, str] = {
     # Original styles
     "academic": "formal academic style with citations",
@@ -121,16 +139,24 @@ class AISummaryService:
         findings: list[dict[str, Any]],
         max_length: int = 500,
         style: str = "medium",
+        citation_style: str = "none",
     ) -> dict[str, Any]:
         """Summarize research findings.
 
         Styles: simple, medium, complex, scientific (research levels)
         or: academic, executive, bullet_points (classic styles).
+
+        citation_style: 'none' | 'inline' | 'bibliography'
+          - 'inline'      — [Author Year] refs in text, no separate list
+          - 'bibliography'— numbered refs [1] + **Literatur** section at end
+          Only applied when style='scientific' (ignored otherwise).
         """
         if not findings:
             return {"summary": "", "key_points": [], "ai_generated": False}
         if self._llm_fn:
-            return await self._llm_summarize(findings, max_length, style)
+            return await self._llm_summarize(
+                findings, max_length, style, citation_style
+            )
         return self._extractive_summarize(findings)
 
     async def summarize_sources(
@@ -182,23 +208,37 @@ class AISummaryService:
         ][:count]
 
     async def _llm_summarize(
-        self, findings: list[dict[str, Any]], max_length: int, style: str
+        self,
+        findings: list[dict[str, Any]],
+        max_length: int,
+        style: str,
+        citation_style: str = "none",
     ) -> dict[str, Any]:
         if self._llm_fn is None:
             return self._extractive_summarize(findings)
         style_instruction = _STYLE_INSTRUCTIONS.get(style, _STYLE_INSTRUCTIONS["medium"])
+        # Citation instructions only make sense for scientific style
+        cite_instruction = ""
+        if style == "scientific" and citation_style != "none":
+            cite_instruction = (
+                "\n\n" + _CITATION_INSTRUCTIONS.get(citation_style, "")
+            )
         content = "\n".join(
             f"- {f.get('title', '')}: {f.get('content', '')[:200]}" for f in findings[:20]
         )
         prompt = (
-            f"Summarize the following research findings in {style_instruction},"
-            f" approximately {max_length} words:\n\n{content}"
+            f"{style_instruction}{cite_instruction}\n\n"
+            f"Forschungsergebnisse (Grundlage):\n{content}"
         )
         summary = await self._llm_fn(prompt, max_tokens=max_length * 2)
         key_points = await self.extract_key_points(summary, max_points=5)
         return {
-            "summary": summary.strip(), "key_points": key_points,
-            "style": style, "ai_generated": True, "source_count": len(findings),
+            "summary": summary.strip(),
+            "key_points": key_points,
+            "style": style,
+            "citation_style": citation_style,
+            "ai_generated": True,
+            "source_count": len(findings),
         }
 
     def _extractive_summarize(self, findings: list[dict[str, Any]]) -> dict[str, Any]:
