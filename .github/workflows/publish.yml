@@ -5,10 +5,10 @@
 #   git push origin iil-researchfw@0.1.0
 #   → GitHub Actions builds + publishes (zero tokens needed)
 #
-# PyPI Trusted Publisher (Pending Publisher):
+# PyPI Trusted Publisher:
 #   Repository: achimdehnert/researchfw
 #   Workflow:   publish.yml
-#   Environment: (leer lassen)
+#   Environment: pypi
 
 name: Publish to PyPI
 
@@ -20,6 +20,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       id-token: write
       contents: read
