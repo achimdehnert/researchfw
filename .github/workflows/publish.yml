@@ -45,7 +45,11 @@ jobs:
           echo "Publishing iil-researchfw v$VERSION"
 
       - name: Set version in pyproject.toml
-        run: hatch version "${{ steps.pkg.outputs.version }}"
+        run: |
+          VERSION="${{ steps.pkg.outputs.version }}"
+          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+          echo "Set version to $VERSION"
+          grep '^version' pyproject.toml
 
       - name: Build
         run: hatch build
