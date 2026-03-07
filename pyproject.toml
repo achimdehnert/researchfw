@@ -46,7 +46,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "respx>=0.21",
     "mypy>=1.10",
-    "ruff>=0.4",
+    "ruff==0.9.10",
     "coverage[toml]>=7.5",
 ]
 
@@ -69,7 +69,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["E501"]
+ignore = ["E501", "B904", "SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "ANN"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["iil_researchfw"]

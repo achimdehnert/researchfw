@@ -84,7 +84,8 @@ class AISummaryService:
     async def _llm_summarize(
         self, findings: list[dict[str, Any]], max_length: int, style: str
     ) -> dict[str, Any]:
-        assert self._llm_fn is not None
+        if self._llm_fn is None:
+            return self._extractive_summarize(findings)
         style_instruction = {
             "academic": "formal academic style with citations",
             "executive": "executive summary, 3-5 bullet points",
