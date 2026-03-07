@@ -50,8 +50,10 @@ class ResearchService:
 
         if self._summary_service and findings:
             try:
+                summary_style = (options or {}).get("summary_style", "medium")
                 result = await self._summary_service.summarize_findings(
-                    [f.model_dump() for f in findings]
+                    [f.model_dump() for f in findings],
+                    style=summary_style,
                 )
                 output = output.model_copy(update={"summary": result.get("summary")})
             except Exception as exc:
