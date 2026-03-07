@@ -43,7 +43,7 @@ _STYLE_INSTRUCTIONS: dict[str, str] = {
 
 def make_together_llm(
     api_key: str | None = None,
-    model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+    model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
 ) -> LLMCallable:
     """
     Factory: returns an async LLMCallable backed by Together AI.
