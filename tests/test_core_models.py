@@ -15,12 +15,12 @@ def test_finding_creation():
 
 def test_finding_is_frozen():
     f = Finding(id="1", title="Test", content="Content")
-    with pytest.raises(Exception):
+    with pytest.raises((TypeError, ValueError)):
         f.id = "2"  # type: ignore[misc]
 
 
 def test_finding_relevance_bounds():
-    with pytest.raises(Exception):
+    with pytest.raises((TypeError, ValueError)):
         Finding(id="1", title="T", content="C", relevance_score=1.5)
 
 

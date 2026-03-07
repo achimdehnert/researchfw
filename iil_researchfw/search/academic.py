@@ -69,7 +69,7 @@ class AcademicSearchService(AsyncBaseSearchProvider):
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         papers: list[AcademicPaper] = []
-        for src, result in zip(source_names, results):
+        for src, result in zip(source_names, results, strict=False):
             if isinstance(result, Exception):
                 logger.warning("%s search failed: %s", src, result)
             else:
