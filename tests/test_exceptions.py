@@ -1,6 +1,11 @@
 """Tests for exception hierarchy."""
 from iil_researchfw.core.exceptions import (
-    APIError, CitationError, ExportError, RateLimitError, ResearchError, SearchError,
+    APIError,
+    CitationError,
+    ExportError,
+    RateLimitError,
+    ResearchError,
+    SearchError,
 )
 
 

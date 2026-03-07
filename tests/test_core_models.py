@@ -1,6 +1,8 @@
 """Tests for core Pydantic models."""
 from datetime import datetime
+
 import pytest
+
 from iil_researchfw.core.models import Finding, ResearchContext, ResearchOutput, Source
 
 

@@ -7,7 +7,11 @@ from iil_researchfw.core.exceptions import (
     SearchError,
 )
 from iil_researchfw.core.models import Finding, ResearchContext, ResearchOutput, Source
-from iil_researchfw.core.protocols import AsyncLLMStreamCallable, LLMCallable, ResearchProjectProtocol
+from iil_researchfw.core.protocols import (
+    AsyncLLMStreamCallable,
+    LLMCallable,
+    ResearchProjectProtocol,
+)
 
 __all__ = [
     "Finding",

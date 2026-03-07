@@ -1,8 +1,15 @@
 """Tests for CitationService and Citation formatting."""
+import httpx
 import pytest
 import respx
-import httpx
-from iil_researchfw.citations.formatter import Author, Citation, CitationService, CitationStyle, SourceType
+
+from iil_researchfw.citations.formatter import (
+    Author,
+    Citation,
+    CitationService,
+    CitationStyle,
+    SourceType,
+)
 from tests.conftest import CROSSREF_FIXTURE
 
 

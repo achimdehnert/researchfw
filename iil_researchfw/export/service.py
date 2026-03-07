@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any
 
 from iil_researchfw.core.exceptions import ExportError
 from iil_researchfw.core.protocols import ResearchProjectProtocol

@@ -1,8 +1,9 @@
 """Central Protocol definitions for iil-researchfw."""
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import Any, AsyncIterator, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from iil_researchfw.core.models import Finding, Source
 

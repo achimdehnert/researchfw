@@ -1,6 +1,8 @@
 """Tests for RateLimiter."""
 import time
+
 import pytest
+
 from iil_researchfw._internal.rate_limiter import RateLimiter
 
 

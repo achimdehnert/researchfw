@@ -1,9 +1,10 @@
 """Tests for AcademicSearchService."""
+import httpx
 import pytest
 import respx
-import httpx
+
 from iil_researchfw.search.academic import AcademicSearchService
-from tests.conftest import ARXIV_XML_FIXTURE, SEMANTIC_SCHOLAR_FIXTURE, OPENALEX_FIXTURE
+from tests.conftest import ARXIV_XML_FIXTURE, OPENALEX_FIXTURE, SEMANTIC_SCHOLAR_FIXTURE
 
 
 def _mock_sources(arxiv_status: int = 200) -> None:

@@ -1,6 +1,8 @@
 """Tests for AISummaryService."""
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
+
 from iil_researchfw.analysis.summary import AISummaryService
 
 FINDINGS = [

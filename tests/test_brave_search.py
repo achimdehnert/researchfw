@@ -1,9 +1,10 @@
 """Tests for BraveSearchService."""
+import httpx
 import pytest
 import respx
-import httpx
-from iil_researchfw.search.brave import BraveSearchService
+
 from iil_researchfw.core.exceptions import RateLimitError
+from iil_researchfw.search.brave import BraveSearchService
 
 BRAVE_RESPONSE = {
     "web": {"results": [{
