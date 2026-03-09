@@ -16,6 +16,7 @@ on:
   push:
     tags:
       - "iil-researchfw@*"
+  workflow_dispatch:
 
 jobs:
   publish:
