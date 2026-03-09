@@ -37,20 +37,12 @@ jobs:
       - name: Install hatch
         run: pip install hatch
 
-      - name: Determine version from tag
+      - name: Read version from pyproject.toml
         id: pkg
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#*@}"
+          VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing iil-researchfw v$VERSION"
-
-      - name: Set version in pyproject.toml
-        run: |
-          VERSION="${{ steps.pkg.outputs.version }}"
-          sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
-          echo "Set version to $VERSION"
-          grep '^version' pyproject.toml
 
       - name: Build
         run: hatch build
