@@ -1,0 +1,19 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: researchfw
+  description: iil-researchfw — AI-powered research framework for structured information gathering and synthesis
+  tags: [python, ai, research, framework, llm]
+  annotations:
+    github.com/project-slug: achimdehnert/researchfw
+    pypi/package-name: "iil-researchfw"
+    pypi/publish-workflow: "publish.yml"
+spec:
+  type: library
+  lifecycle: active
+  owner: achimdehnert
+  system: ai-platform
+  domain: content
+  providesApis: []
+  dependsOn:
+    - component:aifw
