@@ -12,3 +12,7 @@ venv/
 .pytest_cache/
 .coverage
 htmlcov/
+env_loader.py
+
+# IDE agent workflows (symlinked, not repo-specific)
+.windsurf/
