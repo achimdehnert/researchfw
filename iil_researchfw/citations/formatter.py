@@ -290,6 +290,134 @@ class CitationService:
         )
         return "\n\n".join(c.format(style) for c in sorted_citations)
 
+    async def from_isbn(self, isbn: str) -> Citation | None:
+        """Resolve an ISBN (10 or 13) via OpenLibrary API."""
+        isbn_clean = isbn.replace("-", "").replace(" ", "")
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"https://openlibrary.org/api/books?bibkeys=ISBN:{isbn_clean}"
+                    f"&format=json&jscmd=data",
+                    headers={"User-Agent": "iil-researchfw/0.2.0 (research@iil.pet)"},
+                )
+                if response.status_code != 200:
+                    return None
+                data = response.json()
+                book = data.get(f"ISBN:{isbn_clean}")
+                if not book:
+                    return None
+        except httpx.HTTPError as exc:
+            raise CitationError(f"Failed to resolve ISBN {isbn}: {exc}") from exc
+        return self._parse_openlibrary(book, isbn_clean)
+
+    def _parse_openlibrary(self, data: dict[str, Any], isbn: str) -> Citation:
+        authors = [
+            Author(family=a.get("name", "").split()[-1], given=" ".join(a.get("name", "").split()[:-1]))
+            for a in data.get("authors", [])
+        ]
+        publishers = data.get("publishers", [{}])
+        pub_name = publishers[0].get("name", "") if publishers else ""
+        publish_places = data.get("publish_places", [{}])
+        place = publish_places[0].get("name", "") if publish_places else ""
+        year = None
+        publish_date = data.get("publish_date", "")
+        for part in publish_date.split():
+            if part.isdigit() and len(part) == 4:
+                year = int(part)
+                break
+        subjects = data.get("subjects", [])
+        keywords = [s.get("name", "") for s in subjects[:5]] if subjects else []
+        return Citation(
+            title=data.get("title", "Unknown"),
+            authors=authors,
+            year=year,
+            source_type=SourceType.BOOK,
+            publisher=pub_name,
+            place=place,
+            url=data.get("url", ""),
+            keywords=keywords,
+            raw=data,
+        )
+
+    @staticmethod
+    def parse_bibtex(bibtex_str: str) -> list[Citation]:
+        """
+        Parse a BibTeX string and return a list of Citation objects.
+
+        Supports: @article, @book, @inproceedings, @incollection,
+                  @phdthesis, @mastersthesis, @techreport, @misc, @unpublished.
+
+        Example::
+
+            citations = CitationService.parse_bibtex(open("refs.bib").read())
+        """
+        import re
+
+        citations: list[Citation] = []
+        type_map = {
+            "article": SourceType.JOURNAL,
+            "book": SourceType.BOOK,
+            "inproceedings": SourceType.CONFERENCE,
+            "conference": SourceType.CONFERENCE,
+            "incollection": SourceType.CHAPTER,
+            "phdthesis": SourceType.THESIS,
+            "mastersthesis": SourceType.THESIS,
+            "techreport": SourceType.REPORT,
+            "misc": SourceType.WEBSITE,
+            "unpublished": SourceType.PREPRINT,
+        }
+        entry_pattern = re.compile(
+            r"@(\w+)\s*\{([^,]+),\s*(.*?)\n\}", re.DOTALL | re.IGNORECASE
+        )
+        field_pattern = re.compile(
+            r"(\w+)\s*=\s*\{((?:[^{}]|\{[^{}]*\})*)\}", re.DOTALL
+        )
+        for entry_match in entry_pattern.finditer(bibtex_str):
+            entry_type = entry_match.group(1).lower()
+            fields_str = entry_match.group(3)
+            fields: dict[str, str] = {
+                k.lower(): v.strip()
+                for k, v in field_pattern.findall(fields_str)
+            }
+            source_type = type_map.get(entry_type, SourceType.JOURNAL)
+            raw_authors = fields.get("author", "")
+            authors: list[Author] = []
+            if raw_authors:
+                for raw in re.split(r"\s+and\s+", raw_authors, flags=re.IGNORECASE):
+                    raw = raw.strip()
+                    if "," in raw:
+                        parts = [p.strip() for p in raw.split(",", 1)]
+                        authors.append(Author(family=parts[0], given=parts[1] if len(parts) > 1 else ""))
+                    else:
+                        parts_list = raw.split()
+                        if parts_list:
+                            authors.append(Author(family=parts_list[-1], given=" ".join(parts_list[:-1])))
+            year_str = fields.get("year", "")
+            year = int(year_str) if year_str.isdigit() else None
+            pages = fields.get("pages", "").replace("--", "-")
+            keywords_raw = fields.get("keywords", "")
+            keywords = [k.strip() for k in re.split(r"[,;]", keywords_raw) if k.strip()]
+            citations.append(Citation(
+                title=fields.get("title", "Unknown"),
+                authors=authors,
+                year=year,
+                source_type=source_type,
+                journal=fields.get("journal", "") or fields.get("booktitle", ""),
+                volume=fields.get("volume", ""),
+                issue=fields.get("number", ""),
+                pages=pages,
+                publisher=fields.get("publisher", "") or fields.get("school", ""),
+                place=fields.get("address", ""),
+                doi=fields.get("doi", ""),
+                url=fields.get("url", ""),
+                edition=fields.get("edition", ""),
+                editor=fields.get("editor", ""),
+                abstract=fields.get("abstract", "")[:500],
+                keywords=keywords,
+                raw=fields,
+            ))
+        return citations
+
     def export_bibtex(self, citations: list[Citation]) -> str:
         return "\n\n".join(c.to_bibtex() for c in citations)
 

@@ -1,9 +1,15 @@
 """iil-researchfw — Platform research framework."""
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 from iil_researchfw.analysis.summary import AISummaryService, make_together_llm
-from iil_researchfw.citations.formatter import CitationService, CitationStyle
+from iil_researchfw.citations.formatter import (
+    Citation,
+    CitationService,
+    CitationStyle,
+    Author,
+    SourceType,
+)
 from iil_researchfw.core.models import Finding, ResearchContext, ResearchOutput, Source
 from iil_researchfw.core.service import ResearchService
 from iil_researchfw.export.service import ResearchExportService
@@ -18,8 +24,11 @@ __all__ = [
     "Source",
     "AcademicSearchService",
     "BraveSearchService",
+    "Citation",
     "CitationService",
     "CitationStyle",
+    "Author",
+    "SourceType",
     "AISummaryService",
     "make_together_llm",
     "ResearchExportService",
