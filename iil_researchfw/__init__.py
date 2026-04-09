@@ -1,6 +1,6 @@
 """iil-researchfw — Platform research framework."""
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 
 from iil_researchfw.analysis.summary import AISummaryService, make_together_llm
 from iil_researchfw.citations.formatter import (
@@ -15,6 +15,7 @@ from iil_researchfw.core.service import ResearchService
 from iil_researchfw.export.service import ResearchExportService
 from iil_researchfw.search.academic import AcademicSearchService
 from iil_researchfw.search.brave import BraveSearchService
+from iil_researchfw.search.smart import ScoredPaper, SmartSearchResult, SmartSearchService
 
 __all__ = [
     "ResearchService",
@@ -32,4 +33,7 @@ __all__ = [
     "AISummaryService",
     "make_together_llm",
     "ResearchExportService",
+    "SmartSearchService",
+    "SmartSearchResult",
+    "ScoredPaper",
 ]

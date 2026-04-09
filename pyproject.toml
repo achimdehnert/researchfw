@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "iil-researchfw"
-version = "0.4.1"
+version = "0.5.0"
 description = "Platform research framework — search, citations, analysis, export"
 readme = "README.md"
 license = { text = "MIT" }

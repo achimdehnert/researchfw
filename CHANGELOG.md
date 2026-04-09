@@ -4,6 +4,16 @@ All notable changes to `iil-researchfw` are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-04-09
+
+### Added
+- **SmartSearchService** (ADR-160): LLM-powered search pipeline with query expansion and relevance scoring
+  - `_expand_query()`: LLM generates 3-5 optimized academic search queries from a topic
+  - `_score_relevance()`: LLM rates each paper 0-10 with reason (batched, chunks of 10)
+  - Graceful degradation: falls back to basic keyword search if LLM unavailable
+  - New exports: `SmartSearchService`, `SmartSearchResult`, `ScoredPaper`
+- 13 new tests for SmartSearchService (74 total)
+
 ## [0.4.1] — 2026-04-09
 
 ### Improved
