@@ -34,6 +34,7 @@ OPENALEX_FIXTURE = {
         "cited_by_count": 50,
         "open_access": {"is_oa": False},
         "primary_location": {"source": {"display_name": "NeurIPS"}},
+        "abstract_inverted_index": {"A": [0], "review": [1], "of": [2], "transformers": [3]},
     }]
 }
 

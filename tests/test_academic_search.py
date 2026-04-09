@@ -50,3 +50,56 @@ async def test_cache_hit():
         p1 = await service.search("cache test")
         p2 = await service.search("cache test")
     assert p1 == p2
+
+
+@pytest.mark.asyncio
+async def test_semantic_scholar_url_is_web_not_api():
+    """Regression: S2 URLs must point to www.semanticscholar.org, not api."""
+    with respx.mock:
+        _mock_sources()
+        service = AcademicSearchService(cache_ttl_seconds=0)
+        papers = await service.search("test", sources=["semantic_scholar"])
+    assert len(papers) > 0
+    for p in papers:
+        if p.source == "semantic_scholar":
+            assert "www.semanticscholar.org" in p.url, f"Expected web URL, got: {p.url}"
+            assert "api.semanticscholar.org" not in p.url
+
+
+@pytest.mark.asyncio
+async def test_semantic_scholar_extracts_journal():
+    """S2 parser should extract journal/venue."""
+    service = AcademicSearchService(cache_ttl_seconds=0)
+    data = {"data": [{
+        "paperId": "x1",
+        "title": "Test",
+        "authors": [],
+        "abstract": "",
+        "year": 2024,
+        "externalIds": {},
+        "citationCount": 0,
+        "openAccessPdf": None,
+        "journal": {"name": "Nature"},
+        "venue": "Nature Conference",
+    }]}
+    papers = service._parse_semantic_scholar(data)
+    assert papers[0].journal == "Nature"
+
+
+@pytest.mark.asyncio
+async def test_openalex_reconstructs_abstract():
+    """OpenAlex parser should reconstruct abstract from inverted index."""
+    with respx.mock:
+        _mock_sources()
+        service = AcademicSearchService(cache_ttl_seconds=0)
+        papers = await service.search("test", sources=["openalex"])
+    oa_papers = [p for p in papers if p.source == "openalex"]
+    assert len(oa_papers) > 0
+    assert oa_papers[0].abstract == "A review of transformers"
+
+
+def test_reconstruct_abstract_empty():
+    """_reconstruct_abstract handles None and empty dict."""
+    service = AcademicSearchService()
+    assert service._reconstruct_abstract(None) == ""
+    assert service._reconstruct_abstract({}) == ""

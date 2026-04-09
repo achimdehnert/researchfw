@@ -4,6 +4,19 @@ All notable changes to `iil-researchfw` are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-04-09
+
+### Fixed
+- **Semantic Scholar URL bug**: Paper URLs now point to `www.semanticscholar.org` instead of `api.semanticscholar.org` — links are now clickable for users
+- **make_together_llm**: httpx.AsyncClient now created once per call instead of per retry attempt — fewer connections, faster retries
+- **User-Agent headers**: `CitationService.from_doi()` and `from_isbn()` now use dynamic `__version__` instead of hardcoded version strings
+
+### Added
+- **Semantic Scholar journal/venue**: API now queries `venue` and `journal` fields — papers include journal name
+- **OpenAlex abstract reconstruction**: Abstracts reconstructed from `abstract_inverted_index` — previously missing for all OpenAlex papers
+- **Semantic Scholar API key support**: Optional `semantic_scholar_api_key` parameter on `AcademicSearchService` for higher rate limits
+- 5 new regression tests (49 total)
+
 ## [0.1.0] — 2026-03-07
 
 ### Added

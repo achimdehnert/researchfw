@@ -1,13 +1,13 @@
 """iil-researchfw — Platform research framework."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from iil_researchfw.analysis.summary import AISummaryService, make_together_llm
 from iil_researchfw.citations.formatter import (
+    Author,
     Citation,
     CitationService,
     CitationStyle,
-    Author,
     SourceType,
 )
 from iil_researchfw.core.models import Finding, ResearchContext, ResearchOutput, Source

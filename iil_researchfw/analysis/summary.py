@@ -101,8 +101,8 @@ def make_together_llm(
     async def _call(prompt: str, max_tokens: int = 500, **_: Any) -> str:
         if not key:
             return ""
-        for attempt in range(3):
-            async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for attempt in range(3):
                 resp = await client.post(
                     "https://api.together.xyz/v1/chat/completions",
                     headers={"Authorization": f"Bearer {key}"},

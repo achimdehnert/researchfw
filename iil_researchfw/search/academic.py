@@ -41,8 +41,13 @@ class AcademicSearchService(AsyncBaseSearchProvider):
     Per-source failures are isolated — partial results are returned.
     """
 
-    def __init__(self, cache_ttl_seconds: int = 3600) -> None:
+    def __init__(
+        self,
+        cache_ttl_seconds: int = 3600,
+        semantic_scholar_api_key: str | None = None,
+    ) -> None:
         self._cache: TTLCache[list[AcademicPaper]] = TTLCache(ttl_seconds=cache_ttl_seconds)
+        self._s2_api_key = semantic_scholar_api_key
 
     async def search(
         self,
@@ -107,10 +112,15 @@ class AcademicSearchService(AsyncBaseSearchProvider):
         params = {
             "query": query,
             "limit": min(max_results, 100),
-            "fields": "title,authors,abstract,year,externalIds,openAccessPdf,citationCount",
+            "fields": "title,authors,abstract,year,externalIds,openAccessPdf,citationCount,venue,journal",
         }
+        headers: dict[str, str] = {}
+        if self._s2_api_key:
+            headers["x-api-key"] = self._s2_api_key
         response = await client.get(
-            "https://api.semanticscholar.org/graph/v1/paper/search", params=params
+            "https://api.semanticscholar.org/graph/v1/paper/search",
+            params=params,
+            headers=headers,
         )
         if response.status_code == 429:
             raise RateLimitError("semantic_scholar", 429)
@@ -199,10 +209,11 @@ class AcademicSearchService(AsyncBaseSearchProvider):
                 title=item.get("title", ""),
                 authors=[a.get("name", "") for a in item.get("authors", [])],
                 abstract=item.get("abstract", "") or "",
-                url=f"https://api.semanticscholar.org/paper/{item.get('paperId', '')}",
+                url=f"https://www.semanticscholar.org/paper/{item.get('paperId', '')}",
                 source="semantic_scholar",
                 doi=item.get("externalIds", {}).get("DOI"),
                 publication_date=str(item.get("year", "")),
+                journal=item.get("journal", {}).get("name", "") if item.get("journal") else item.get("venue", ""),
                 citation_count=item.get("citationCount"),
                 pdf_url=(item.get("openAccessPdf") or {}).get("url"),
             )
@@ -237,12 +248,14 @@ class AcademicSearchService(AsyncBaseSearchProvider):
             loc = item.get("primary_location") or {}
             src = loc.get("source") or {}
             oa = item.get("open_access", {})
+            abstract = self._reconstruct_abstract(item.get("abstract_inverted_index"))
             papers.append(AcademicPaper(
                 title=item.get("title") or "Unknown",
                 authors=[
                     auth.get("author", {}).get("display_name", "")
                     for auth in item.get("authorships", [])[:10]
                 ],
+                abstract=abstract[:500],
                 url=item.get("id", ""),
                 source="openalex",
                 doi=doi or None,
@@ -252,6 +265,18 @@ class AcademicSearchService(AsyncBaseSearchProvider):
                 pdf_url=oa.get("oa_url") if oa.get("is_oa") else None,
             ))
         return papers
+
+    @staticmethod
+    def _reconstruct_abstract(inverted_index: dict[str, list[int]] | None) -> str:
+        """Reconstruct abstract from OpenAlex inverted index format."""
+        if not inverted_index:
+            return ""
+        word_positions: list[tuple[int, str]] = []
+        for word, positions in inverted_index.items():
+            for pos in positions:
+                word_positions.append((pos, word))
+        word_positions.sort()
+        return " ".join(word for _, word in word_positions)
 
     def _deduplicate(self, papers: list[AcademicPaper]) -> list[AcademicPaper]:
         seen_dois: set[str] = set()

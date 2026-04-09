@@ -10,6 +10,11 @@ import httpx
 
 from iil_researchfw.core.exceptions import CitationError
 
+
+def _user_agent() -> str:
+    from iil_researchfw import __version__
+    return f"iil-researchfw/{__version__} (research@iil.pet)"
+
 logger = logging.getLogger(__name__)
 
 
@@ -238,7 +243,7 @@ class CitationService:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
                     f"https://api.crossref.org/works/{doi}",
-                    headers={"User-Agent": "iil-researchfw/0.1.0 (research@iil.pet)"},
+                    headers={"User-Agent": _user_agent()},
                 )
                 if response.status_code != 200:
                     return None
@@ -298,7 +303,7 @@ class CitationService:
                 response = await client.get(
                     f"https://openlibrary.org/api/books?bibkeys=ISBN:{isbn_clean}"
                     f"&format=json&jscmd=data",
-                    headers={"User-Agent": "iil-researchfw/0.2.0 (research@iil.pet)"},
+                    headers={"User-Agent": _user_agent()},
                 )
                 if response.status_code != 200:
                     return None
