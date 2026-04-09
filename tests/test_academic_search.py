@@ -3,7 +3,7 @@ import httpx
 import pytest
 import respx
 
-from iil_researchfw.search.academic import AcademicSearchService
+from iil_researchfw.search.academic import AcademicPaper, AcademicSearchService
 from tests.conftest import ARXIV_XML_FIXTURE, OPENALEX_FIXTURE, SEMANTIC_SCHOLAR_FIXTURE
 
 
@@ -103,3 +103,71 @@ def test_reconstruct_abstract_empty():
     service = AcademicSearchService()
     assert service._reconstruct_abstract(None) == ""
     assert service._reconstruct_abstract({}) == ""
+
+
+def test_fuzzy_dedup_exact_match():
+    """Exact same title is deduped."""
+    service = AcademicSearchService()
+    papers = [
+        AcademicPaper(title="Deep Learning", source="arxiv"),
+        AcademicPaper(title="Deep Learning", source="openalex"),
+    ]
+    result = service._deduplicate(papers)
+    assert len(result) == 1
+
+
+def test_fuzzy_dedup_subtitle_variation():
+    """Same paper with/without subtitle is deduped."""
+    service = AcademicSearchService()
+    papers = [
+        AcademicPaper(title="Deep Learning: A Comprehensive Survey", source="arxiv"),
+        AcademicPaper(title="Deep Learning A Comprehensive Survey", source="openalex"),
+    ]
+    result = service._deduplicate(papers)
+    assert len(result) == 1
+
+
+def test_fuzzy_dedup_punctuation_difference():
+    """Titles differing only in punctuation are deduped."""
+    service = AcademicSearchService()
+    papers = [
+        AcademicPaper(title="Attention Is All You Need.", source="arxiv"),
+        AcademicPaper(title="Attention Is All You Need", source="s2"),
+    ]
+    result = service._deduplicate(papers)
+    assert len(result) == 1
+
+
+def test_fuzzy_dedup_keeps_different_papers():
+    """Genuinely different papers are kept."""
+    service = AcademicSearchService()
+    papers = [
+        AcademicPaper(title="Deep Learning for Computer Vision", source="arxiv"),
+        AcademicPaper(title="Reinforcement Learning in Robotics", source="openalex"),
+    ]
+    result = service._deduplicate(papers)
+    assert len(result) == 2
+
+
+def test_fuzzy_dedup_doi_takes_priority():
+    """Same DOI dedupes even if titles are different."""
+    service = AcademicSearchService()
+    papers = [
+        AcademicPaper(title="Paper A (preprint)", doi="10.1234/test", source="arxiv"),
+        AcademicPaper(title="Paper A: Final Version", doi="10.1234/test", source="s2"),
+    ]
+    result = service._deduplicate(papers)
+    assert len(result) == 1
+
+
+def test_normalize_title():
+    service = AcademicSearchService()
+    assert service._normalize_title("  Hello, World!  ") == "hello world"
+    assert service._normalize_title("A—B: C") == "ab c"
+
+
+def test_titles_similar_threshold():
+    service = AcademicSearchService()
+    assert service._titles_similar("deep learning survey", "deep learning survey") is True
+    assert service._titles_similar("deep learning survey methods", "deep learning survey") is True
+    assert service._titles_similar("cats", "dogs") is False

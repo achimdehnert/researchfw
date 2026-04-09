@@ -280,16 +280,44 @@ class AcademicSearchService(AsyncBaseSearchProvider):
 
     def _deduplicate(self, papers: list[AcademicPaper]) -> list[AcademicPaper]:
         seen_dois: set[str] = set()
-        seen_titles: set[str] = set()
+        seen_titles: list[str] = []
         result = []
         for p in papers:
             if p.doi and p.doi in seen_dois:
                 continue
-            norm = p.title.lower().strip()
-            if norm in seen_titles:
+            norm = self._normalize_title(p.title)
+            if not norm:
+                result.append(p)
+                continue
+            if any(self._titles_similar(norm, t) for t in seen_titles):
                 continue
             if p.doi:
                 seen_dois.add(p.doi)
-            seen_titles.add(norm)
+            seen_titles.append(norm)
             result.append(p)
         return result
+
+    @staticmethod
+    def _normalize_title(title: str) -> str:
+        """Lowercase, strip punctuation and extra whitespace."""
+        import re
+        title = title.lower().strip()
+        title = re.sub(r"[^\w\s]", "", title)
+        return re.sub(r"\s+", " ", title).strip()
+
+    @staticmethod
+    def _titles_similar(a: str, b: str) -> bool:
+        """Check if two normalized titles are similar enough to be duplicates.
+
+        Uses token overlap ratio — if ≥85% of tokens match, treat as duplicate.
+        Handles subtitles, minor wording differences, and reordering.
+        """
+        if a == b:
+            return True
+        tokens_a = set(a.split())
+        tokens_b = set(b.split())
+        if not tokens_a or not tokens_b:
+            return False
+        intersection = len(tokens_a & tokens_b)
+        smaller = min(len(tokens_a), len(tokens_b))
+        return intersection / smaller >= 0.85

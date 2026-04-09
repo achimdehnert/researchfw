@@ -4,6 +4,15 @@ All notable changes to `iil-researchfw` are documented here.
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-04-09
+
+### Improved
+- **Fuzzy title dedup**: Papers with slightly different titles (punctuation, subtitles, reordering) are now correctly deduplicated using token overlap ratio (≥85% threshold)
+- **TTLCache max_size + LRU eviction**: Cache now enforces a configurable `max_size` (default 256) with LRU eviction. Expired entries are proactively cleaned on `set()`. New `size` property and `_evict_expired()` method.
+
+### Added
+- 12 new tests: 7 fuzzy dedup + 5 cache LRU (61 total)
+
 ## [0.4.0] — 2026-04-09
 
 ### Fixed
