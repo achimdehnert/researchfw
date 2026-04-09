@@ -4,6 +4,20 @@ All notable changes to `iil-researchfw` are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-04-09
+
+### Added
+- **Citation Graph Expansion** (ADR-160 Phase 5): Follow references and citations of top papers via Semantic Scholar Graph API
+  - `get_references()` / `get_citations()` on AcademicSearchService
+  - `_expand_via_citations()`: traverses top-5 papers, fetches refs+cites, deduplicates
+  - `_get_s2_paper_id()`: resolves DOI, ArXiv ID, or S2 URL to paper identifier
+  - Opt-in via `expand_citations=True`
+- **Iterative Gap Analysis** (ADR-160 Phase 6): LLM identifies missing aspects and generates follow-up queries
+  - `_analyze_gaps()`: LLM reviews current results, identifies gaps, generates new queries
+  - `search_rounds` parameter (1-3, default 1) controls iteration depth
+  - Each round: gap analysis → new queries → search → score → merge
+- 15 new tests for Phase 5+6 (89 total)
+
 ## [0.5.0] — 2026-04-09
 
 ### Added

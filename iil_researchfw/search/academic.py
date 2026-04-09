@@ -297,6 +297,64 @@ class AcademicSearchService(AsyncBaseSearchProvider):
             result.append(p)
         return result
 
+    async def get_references(
+        self, paper_id: str, limit: int = 20
+    ) -> list[AcademicPaper]:
+        """Fetch references (papers cited BY this paper) from Semantic Scholar."""
+        return await self._fetch_citation_graph(paper_id, "references", limit)
+
+    async def get_citations(
+        self, paper_id: str, limit: int = 20
+    ) -> list[AcademicPaper]:
+        """Fetch citations (papers that CITE this paper) from Semantic Scholar."""
+        return await self._fetch_citation_graph(paper_id, "citations", limit)
+
+    async def _fetch_citation_graph(
+        self, paper_id: str, direction: str, limit: int
+    ) -> list[AcademicPaper]:
+        """Fetch references or citations from Semantic Scholar Graph API."""
+        url = f"https://api.semanticscholar.org/graph/v1/paper/{paper_id}/{direction}"
+        params = {
+            "fields": "title,authors,abstract,year,externalIds,citationCount,venue",
+            "limit": min(limit, 100),
+        }
+        headers: dict[str, str] = {}
+        if self._s2_api_key:
+            headers["x-api-key"] = self._s2_api_key
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(url, params=params, headers=headers)
+                if resp.status_code == 429:
+                    logger.warning("S2 citation graph rate limited for %s", paper_id)
+                    return []
+                resp.raise_for_status()
+                data = resp.json().get("data", [])
+        except Exception as exc:
+            logger.warning("S2 citation graph error for %s: %s", paper_id, exc)
+            return []
+
+        papers: list[AcademicPaper] = []
+        key = "citedPaper" if direction == "references" else "citingPaper"
+        for item in data:
+            p = item.get(key, {})
+            if not p or not p.get("title"):
+                continue
+            ext = p.get("externalIds") or {}
+            authors = [a.get("name", "") for a in (p.get("authors") or []) if a.get("name")]
+            papers.append(AcademicPaper(
+                title=p["title"],
+                authors=authors,
+                abstract=p.get("abstract") or "",
+                url=f"https://www.semanticscholar.org/paper/{p.get('paperId', '')}",
+                source="semantic_scholar",
+                doi=ext.get("DOI"),
+                arxiv_id=ext.get("ArXiv"),
+                publication_date=str(p.get("year", "")),
+                journal=(p.get("venue") or ""),
+                citation_count=p.get("citationCount"),
+            ))
+        return papers
+
     @staticmethod
     def _normalize_title(title: str) -> str:
         """Lowercase, strip punctuation and extra whitespace."""
