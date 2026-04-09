@@ -1,6 +1,7 @@
 """Smart search — LLM-powered query expansion + relevance scoring (ADR-160)."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -202,13 +203,18 @@ class SmartSearchService:
     async def _search_queries(
         self, queries: list[str], sources: list[str] | None, max_results: int
     ) -> list[AcademicPaper]:
-        """Search all queries across all sources."""
+        """Search all queries across all sources (parallel)."""
+        tasks = [
+            self._academic.search(query=q, sources=sources, max_results=max_results)
+            for q in queries
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         all_papers: list[AcademicPaper] = []
-        for query in queries:
-            papers = await self._academic.search(
-                query=query, sources=sources, max_results=max_results,
-            )
-            all_papers.extend(papers)
+        for r in results:
+            if isinstance(r, list):
+                all_papers.extend(r)
+            elif isinstance(r, Exception):
+                logger.warning("SmartSearch: parallel query error: %s", r)
         return all_papers
 
     async def _expand_query(self, topic: str) -> list[str]:
@@ -311,20 +317,30 @@ class SmartSearchService:
     async def _expand_via_citations(
         self, top_papers: list[ScoredPaper]
     ) -> list[AcademicPaper]:
-        """Follow citation graph of top papers to find seminal works."""
-        all_citation_papers: list[AcademicPaper] = []
+        """Follow citation graph of top papers to find seminal works (parallel)."""
         seen_ids: set[str] = set()
-
+        paper_ids: list[str] = []
         for sp in top_papers:
             paper_id = self._get_s2_paper_id(sp.paper)
-            if not paper_id or paper_id in seen_ids:
-                continue
-            seen_ids.add(paper_id)
+            if paper_id and paper_id not in seen_ids:
+                seen_ids.add(paper_id)
+                paper_ids.append(paper_id)
 
-            refs = await self._academic.get_references(paper_id, limit=10)
-            cites = await self._academic.get_citations(paper_id, limit=10)
-            all_citation_papers.extend(refs)
-            all_citation_papers.extend(cites)
+        if not paper_ids:
+            return []
+
+        tasks = []
+        for pid in paper_ids:
+            tasks.append(self._academic.get_references(pid, limit=10))
+            tasks.append(self._academic.get_citations(pid, limit=10))
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        all_citation_papers: list[AcademicPaper] = []
+        for r in results:
+            if isinstance(r, list):
+                all_citation_papers.extend(r)
+            elif isinstance(r, Exception):
+                logger.warning("SmartSearch: citation graph error: %s", r)
 
         return self._academic._deduplicate(all_citation_papers)
 
