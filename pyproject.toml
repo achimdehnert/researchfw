@@ -15,8 +15,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
@@ -61,15 +59,17 @@ packages = ["iil_researchfw"]
 
 [tool.mypy]
 strict = true
-python_version = "3.11"
+python_version = "3.12"
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-ignore = ["E501", "B904", "SIM108"]
+# UP046: PEP 695 generic syntax (`class C[T]`) — surfaced by the py312 target;
+# deferred with the UP042 StrEnum modernizations to a later agent-readiness tier.
+ignore = ["E501", "B904", "SIM108", "UP046"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "ANN"]
