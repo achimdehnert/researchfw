@@ -1,6 +1,6 @@
 # Python Package — Developer Makefile
 
-.PHONY: install test test-v lint clean build help
+.PHONY: install test test-v lint types clean build help
 
 PYTHON := python3
 PIP    := pip
@@ -11,6 +11,7 @@ help:
 	@echo "  test      — pytest (quiet)"
 	@echo "  test-v    — pytest (verbose)"
 	@echo "  lint      — ruff check"
+	@echo "  types     — mypy (advisory — not yet green, see CLAUDE.md)"
 	@echo "  build     — build wheel + sdist"
 	@echo "  clean     — remove build artifacts"
 
@@ -25,6 +26,9 @@ test-v:
 
 lint:
 	ruff check .
+
+types:
+	$(PYTHON) -m mypy iil_researchfw
 
 build:
 	$(PYTHON) -m build
