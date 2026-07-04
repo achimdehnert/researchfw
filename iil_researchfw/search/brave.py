@@ -1,4 +1,5 @@
 """Brave Search API — async web search provider."""
+
 from __future__ import annotations
 
 import logging

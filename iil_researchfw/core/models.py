@@ -1,4 +1,5 @@
 """Pydantic v2 models for iil-researchfw."""
+
 from __future__ import annotations
 
 from datetime import datetime

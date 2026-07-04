@@ -1,9 +1,10 @@
 """Citation management — APA, MLA, Chicago, Harvard, IEEE, Vancouver."""
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import httpx
@@ -13,12 +14,14 @@ from iil_researchfw.core.exceptions import CitationError
 
 def _user_agent() -> str:
     from iil_researchfw import __version__
+
     return f"iil-researchfw/{__version__} (research@iil.pet)"
+
 
 logger = logging.getLogger(__name__)
 
 
-class CitationStyle(str, Enum):
+class CitationStyle(StrEnum):
     APA = "apa"
     MLA = "mla"
     CHICAGO = "chicago"
@@ -27,7 +30,7 @@ class CitationStyle(str, Enum):
     VANCOUVER = "vancouver"
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     JOURNAL = "journal"
     BOOK = "book"
     CHAPTER = "chapter"
@@ -105,7 +108,9 @@ class Citation:
     def _format_apa(self) -> str:
         authors_str = ", ".join(a.format_apa() for a in self.authors[:20])
         year = f"({self.year})" if self.year else "(n.d.)"
-        doi_str = f" https://doi.org/{self.doi}" if self.doi else (f" {self.url}" if self.url else "")
+        doi_str = (
+            f" https://doi.org/{self.doi}" if self.doi else (f" {self.url}" if self.url else "")
+        )
         if self.source_type == SourceType.JOURNAL:
             vol = f", *{self.volume}*" if self.volume else ""
             iss = f"({self.issue})" if self.issue else ""
@@ -128,7 +133,7 @@ class Citation:
             iss = f"no. {self.issue}, " if self.issue else ""
             pgs = f"pp. {self.pages}" if self.pages else ""
             return f'{authors_str}. "{self.title}." *{self.journal}*, {vol}{iss}{year}, {pgs}.'
-        return f'{authors_str}. *{self.title}*. {self.publisher}, {year}.'
+        return f"{authors_str}. *{self.title}*. {self.publisher}, {year}."
 
     def _format_chicago(self) -> str:
         if self.authors:
@@ -143,7 +148,9 @@ class Citation:
             vol = f" {self.volume}" if self.volume else ""
             iss = f", no. {self.issue}" if self.issue else ""
             pgs = f": {self.pages}" if self.pages else ""
-            return f'{authors_str}. "{self.title}." *{self.journal}*{vol}{iss} ({year}){pgs}{doi_str}'
+            return (
+                f'{authors_str}. "{self.title}." *{self.journal}*{vol}{iss} ({year}){pgs}{doi_str}'
+            )
         return f"{authors_str}. *{self.title}*. {self.place}: {self.publisher}, {year}{doi_str}"
 
     def _format_harvard(self) -> str:
@@ -154,7 +161,9 @@ class Citation:
             vol = f", {self.volume}" if self.volume else ""
             iss = f"({self.issue})" if self.issue else ""
             pgs = f", pp. {self.pages}" if self.pages else ""
-            return f"{authors_str} ({year}) '{self.title}', *{self.journal}*{vol}{iss}{pgs}.{doi_str}"
+            return (
+                f"{authors_str} ({year}) '{self.title}', *{self.journal}*{vol}{iss}{pgs}.{doi_str}"
+            )
         return f"{authors_str} ({year}) *{self.title}*. {self.publisher}.{doi_str}"
 
     def _format_ieee(self) -> str:
@@ -165,8 +174,10 @@ class Citation:
             vol = f", vol. {self.volume}" if self.volume else ""
             iss = f", no. {self.issue}" if self.issue else ""
             pgs = f", pp. {self.pages}" if self.pages else ""
-            return f'{authors_str}, "{self.title}," *{self.journal}*{vol}{iss}{pgs}, {year}{doi_str}'
-        return f'{authors_str}, *{self.title}*, {self.publisher}, {year}{doi_str}'
+            return (
+                f'{authors_str}, "{self.title}," *{self.journal}*{vol}{iss}{pgs}, {year}{doi_str}'
+            )
+        return f"{authors_str}, *{self.title}*, {self.publisher}, {year}{doi_str}"
 
     def _format_vancouver(self) -> str:
         authors_str = ", ".join(a.format_apa() for a in self.authors)
@@ -184,7 +195,7 @@ class Citation:
         lines = [f"@article{{{key},"]
         lines.append(f"  title = {{{self.title}}},")
         if self.authors:
-            lines.append(f"  author = {{{ ' and '.join(a.full_name() for a in self.authors)}}},")
+            lines.append(f"  author = {{{' and '.join(a.full_name() for a in self.authors)}}},")
         if self.year:
             lines.append(f"  year = {{{self.year}}},")
         if self.journal:
@@ -204,10 +215,14 @@ class Citation:
 
     def to_ris(self) -> str:
         type_map = {
-            SourceType.JOURNAL: "JOUR", SourceType.BOOK: "BOOK",
-            SourceType.CHAPTER: "CHAP", SourceType.CONFERENCE: "CONF",
-            SourceType.THESIS: "THES", SourceType.WEBSITE: "ELEC",
-            SourceType.PREPRINT: "UNPB", SourceType.REPORT: "RPRT",
+            SourceType.JOURNAL: "JOUR",
+            SourceType.BOOK: "BOOK",
+            SourceType.CHAPTER: "CHAP",
+            SourceType.CONFERENCE: "CONF",
+            SourceType.THESIS: "THES",
+            SourceType.WEBSITE: "ELEC",
+            SourceType.PREPRINT: "UNPB",
+            SourceType.REPORT: "RPRT",
         }
         lines = [f"TY  - {type_map.get(self.source_type, 'GEN')}"]
         lines.append(f"TI  - {self.title}")
@@ -277,11 +292,16 @@ class CitationService:
         journals = data.get("container-title", [""])
         return Citation(
             title=titles[0] if titles else "Unknown",
-            authors=authors, year=year, source_type=source_type,
+            authors=authors,
+            year=year,
+            source_type=source_type,
             journal=journals[0] if journals else "",
-            volume=data.get("volume", ""), issue=data.get("issue", ""),
-            pages=data.get("page", ""), publisher=data.get("publisher", ""),
-            doi=doi, url=data.get("URL", ""),
+            volume=data.get("volume", ""),
+            issue=data.get("issue", ""),
+            pages=data.get("page", ""),
+            publisher=data.get("publisher", ""),
+            doi=doi,
+            url=data.get("URL", ""),
             abstract=(data.get("abstract", "") or "")[:500],
             raw=data,
         )
@@ -291,7 +311,7 @@ class CitationService:
     ) -> str:
         sorted_citations = sorted(
             citations,
-            key=lambda c: (c.authors[0].family.lower() if c.authors else c.title.lower()),
+            key=lambda c: c.authors[0].family.lower() if c.authors else c.title.lower(),
         )
         return "\n\n".join(c.format(style) for c in sorted_citations)
 
@@ -317,7 +337,9 @@ class CitationService:
 
     def _parse_openlibrary(self, data: dict[str, Any], isbn: str) -> Citation:
         authors = [
-            Author(family=a.get("name", "").split()[-1], given=" ".join(a.get("name", "").split()[:-1]))
+            Author(
+                family=a.get("name", "").split()[-1], given=" ".join(a.get("name", "").split()[:-1])
+            )
             for a in data.get("authors", [])
         ]
         publishers = data.get("publishers", [{}])
@@ -371,18 +393,13 @@ class CitationService:
             "misc": SourceType.WEBSITE,
             "unpublished": SourceType.PREPRINT,
         }
-        entry_pattern = re.compile(
-            r"@(\w+)\s*\{([^,]+),\s*(.*?)\n\}", re.DOTALL | re.IGNORECASE
-        )
-        field_pattern = re.compile(
-            r"(\w+)\s*=\s*\{((?:[^{}]|\{[^{}]*\})*)\}", re.DOTALL
-        )
+        entry_pattern = re.compile(r"@(\w+)\s*\{([^,]+),\s*(.*?)\n\}", re.DOTALL | re.IGNORECASE)
+        field_pattern = re.compile(r"(\w+)\s*=\s*\{((?:[^{}]|\{[^{}]*\})*)\}", re.DOTALL)
         for entry_match in entry_pattern.finditer(bibtex_str):
             entry_type = entry_match.group(1).lower()
             fields_str = entry_match.group(3)
             fields: dict[str, str] = {
-                k.lower(): v.strip()
-                for k, v in field_pattern.findall(fields_str)
+                k.lower(): v.strip() for k, v in field_pattern.findall(fields_str)
             }
             source_type = type_map.get(entry_type, SourceType.JOURNAL)
             raw_authors = fields.get("author", "")
@@ -392,35 +409,41 @@ class CitationService:
                     raw = raw.strip()
                     if "," in raw:
                         parts = [p.strip() for p in raw.split(",", 1)]
-                        authors.append(Author(family=parts[0], given=parts[1] if len(parts) > 1 else ""))
+                        authors.append(
+                            Author(family=parts[0], given=parts[1] if len(parts) > 1 else "")
+                        )
                     else:
                         parts_list = raw.split()
                         if parts_list:
-                            authors.append(Author(family=parts_list[-1], given=" ".join(parts_list[:-1])))
+                            authors.append(
+                                Author(family=parts_list[-1], given=" ".join(parts_list[:-1]))
+                            )
             year_str = fields.get("year", "")
             year = int(year_str) if year_str.isdigit() else None
             pages = fields.get("pages", "").replace("--", "-")
             keywords_raw = fields.get("keywords", "")
             keywords = [k.strip() for k in re.split(r"[,;]", keywords_raw) if k.strip()]
-            citations.append(Citation(
-                title=fields.get("title", "Unknown"),
-                authors=authors,
-                year=year,
-                source_type=source_type,
-                journal=fields.get("journal", "") or fields.get("booktitle", ""),
-                volume=fields.get("volume", ""),
-                issue=fields.get("number", ""),
-                pages=pages,
-                publisher=fields.get("publisher", "") or fields.get("school", ""),
-                place=fields.get("address", ""),
-                doi=fields.get("doi", ""),
-                url=fields.get("url", ""),
-                edition=fields.get("edition", ""),
-                editor=fields.get("editor", ""),
-                abstract=fields.get("abstract", "")[:500],
-                keywords=keywords,
-                raw=fields,
-            ))
+            citations.append(
+                Citation(
+                    title=fields.get("title", "Unknown"),
+                    authors=authors,
+                    year=year,
+                    source_type=source_type,
+                    journal=fields.get("journal", "") or fields.get("booktitle", ""),
+                    volume=fields.get("volume", ""),
+                    issue=fields.get("number", ""),
+                    pages=pages,
+                    publisher=fields.get("publisher", "") or fields.get("school", ""),
+                    place=fields.get("address", ""),
+                    doi=fields.get("doi", ""),
+                    url=fields.get("url", ""),
+                    edition=fields.get("edition", ""),
+                    editor=fields.get("editor", ""),
+                    abstract=fields.get("abstract", "")[:500],
+                    keywords=keywords,
+                    raw=fields,
+                )
+            )
         return citations
 
     def export_bibtex(self, citations: list[Citation]) -> str:

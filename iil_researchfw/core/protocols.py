@@ -1,4 +1,5 @@
 """Central Protocol definitions for iil-researchfw."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator

@@ -1,4 +1,5 @@
 """Tests for SmartSearchService (ADR-160)."""
+
 import json
 
 import httpx
@@ -86,32 +87,39 @@ def _mock_citation_graph() -> None:
 
 # --- Mock LLM functions ---
 
+
 async def _mock_llm_good(prompt: str, max_tokens: int = 500, **_) -> str:
     """Mock LLM that returns valid responses for all prompt types."""
     lower = prompt.lower()
     # Gap analysis check MUST come before "search queries" since gap prompt also contains that phrase
     if "missing" in lower and "gaps" in lower:
-        return json.dumps({
-            "gaps": ["ethical implications of AI", "energy efficiency of training"],
-            "queries": [
-                "AI ethics machine learning fairness",
-                "energy efficient deep learning training",
-            ]
-        })
+        return json.dumps(
+            {
+                "gaps": ["ethical implications of AI", "energy efficiency of training"],
+                "queries": [
+                    "AI ethics machine learning fairness",
+                    "energy efficient deep learning training",
+                ],
+            }
+        )
     if "search queries" in lower:
-        return json.dumps({
-            "queries": [
-                "machine learning advances 2024",
-                "deep learning neural networks survey",
-                "transformer architecture applications",
-            ]
-        })
+        return json.dumps(
+            {
+                "queries": [
+                    "machine learning advances 2024",
+                    "deep learning neural networks survey",
+                    "transformer architecture applications",
+                ]
+            }
+        )
     if "relevance" in lower:
-        return json.dumps([
-            {"index": 0, "score": 9, "reason": "Directly about deep learning"},
-            {"index": 1, "score": 8, "reason": "Related transformer work"},
-            {"index": 2, "score": 3, "reason": "Only tangentially related"},
-        ])
+        return json.dumps(
+            [
+                {"index": 0, "score": 9, "reason": "Directly about deep learning"},
+                {"index": 1, "score": 8, "reason": "Related transformer work"},
+                {"index": 2, "score": 3, "reason": "Only tangentially related"},
+            ]
+        )
     return ""
 
 
@@ -126,6 +134,7 @@ async def _mock_llm_error(prompt: str, max_tokens: int = 500, **_) -> str:
 
 
 # --- Phase 1-4 Tests ---
+
 
 @pytest.mark.asyncio
 async def test_smart_search_full_pipeline():
@@ -273,6 +282,7 @@ def test_scored_paper_defaults():
 
 # --- Phase 5: Citation Graph Expansion ---
 
+
 @pytest.mark.asyncio
 async def test_citation_graph_expansion():
     """expand_citations=True fetches references + citations and scores them."""
@@ -316,10 +326,12 @@ async def test_expand_via_citations_uses_doi():
             llm_fn=_mock_llm_good,
             academic_service=AcademicSearchService(cache_ttl_seconds=0),
         )
-        papers = [ScoredPaper(
-            paper=AcademicPaper(title="Test", doi="10.1234/test", source="s2"),
-            relevance_score=9.0,
-        )]
+        papers = [
+            ScoredPaper(
+                paper=AcademicPaper(title="Test", doi="10.1234/test", source="s2"),
+                relevance_score=9.0,
+            )
+        ]
         citation_papers = await service._expand_via_citations(papers)
 
     assert len(citation_papers) >= 1
@@ -341,10 +353,12 @@ async def test_expand_via_citations_graceful_on_error():
             llm_fn=_mock_llm_good,
             academic_service=AcademicSearchService(cache_ttl_seconds=0),
         )
-        papers = [ScoredPaper(
-            paper=AcademicPaper(title="Test", doi="10.1234/test", source="s2"),
-            relevance_score=9.0,
-        )]
+        papers = [
+            ScoredPaper(
+                paper=AcademicPaper(title="Test", doi="10.1234/test", source="s2"),
+                relevance_score=9.0,
+            )
+        ]
         citation_papers = await service._expand_via_citations(papers)
 
     assert citation_papers == []
@@ -375,6 +389,7 @@ def test_get_s2_paper_id_none():
 
 
 # --- Phase 6: Iterative Gap Analysis ---
+
 
 @pytest.mark.asyncio
 async def test_iterative_search_two_rounds():
@@ -413,10 +428,12 @@ async def test_iterative_search_default_one_round():
 async def test_gap_analysis_parses_json():
     """_analyze_gaps returns new queries from LLM response."""
     service = SmartSearchService(llm_fn=_mock_llm_good)
-    papers = [ScoredPaper(
-        paper=AcademicPaper(title="Deep Learning Survey"),
-        relevance_score=9.0,
-    )]
+    papers = [
+        ScoredPaper(
+            paper=AcademicPaper(title="Deep Learning Survey"),
+            relevance_score=9.0,
+        )
+    ]
     gaps = await service._analyze_gaps(papers, "machine learning")
     assert len(gaps) == 2
     assert "AI ethics machine learning fairness" in gaps
@@ -449,6 +466,7 @@ async def test_search_rounds_clamped():
 
 
 # --- Phase 5+6 combined ---
+
 
 @pytest.mark.asyncio
 async def test_full_pipeline_all_features():

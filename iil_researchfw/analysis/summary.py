@@ -1,4 +1,5 @@
 """AI-powered research summary — LLM-agnostic via Protocol injection."""
+
 from __future__ import annotations
 
 import asyncio
@@ -114,7 +115,7 @@ def make_together_llm(
                     },
                 )
                 if resp.status_code == 429:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
                     continue
                 resp.raise_for_status()
                 return resp.json()["choices"][0]["message"]["content"].strip()
@@ -154,9 +155,7 @@ class AISummaryService:
         if not findings:
             return {"summary": "", "key_points": [], "ai_generated": False}
         if self._llm_fn:
-            return await self._llm_summarize(
-                findings, max_length, style, citation_style
-            )
+            return await self._llm_summarize(findings, max_length, style, citation_style)
         return self._extractive_summarize(findings)
 
     async def summarize_sources(
@@ -174,7 +173,11 @@ class AISummaryService:
             )
             text = await self._llm_fn(prompt, max_tokens=max_length * 2)
             return {"summary": text.strip(), "themes": [], "ai_generated": True}
-        return {"summary": f"Analysis of {len(sources)} sources.", "themes": [], "ai_generated": False}
+        return {
+            "summary": f"Analysis of {len(sources)} sources.",
+            "themes": [],
+            "ai_generated": False,
+        }
 
     async def extract_key_points(self, text: str, max_points: int = 5) -> list[str]:
         """Extract key points from text."""
@@ -184,7 +187,9 @@ class AISummaryService:
                 f"Format: one point per line, starting with '- '\n\n{text[:3000]}"
             )
             result = await self._llm_fn(prompt, max_tokens=300)
-            points = [line.lstrip("- ").strip() for line in result.strip().splitlines() if line.strip()]
+            points = [
+                line.lstrip("- ").strip() for line in result.strip().splitlines() if line.strip()
+            ]
             return points[:max_points]
         sentences = [s.strip() for s in text.replace("\n", " ").split(".") if s.strip()]
         return sentences[:max_points]
@@ -220,15 +225,12 @@ class AISummaryService:
         # Citation instructions only make sense for scientific style
         cite_instruction = ""
         if style == "scientific" and citation_style != "none":
-            cite_instruction = (
-                "\n\n" + _CITATION_INSTRUCTIONS.get(citation_style, "")
-            )
+            cite_instruction = "\n\n" + _CITATION_INSTRUCTIONS.get(citation_style, "")
         content = "\n".join(
             f"- {f.get('title', '')}: {f.get('content', '')[:200]}" for f in findings[:20]
         )
         prompt = (
-            f"{style_instruction}{cite_instruction}\n\n"
-            f"Forschungsergebnisse (Grundlage):\n{content}"
+            f"{style_instruction}{cite_instruction}\n\nForschungsergebnisse (Grundlage):\n{content}"
         )
         summary = await self._llm_fn(prompt, max_tokens=max_length * 2)
         key_points = await self.extract_key_points(summary, max_points=5)
@@ -245,6 +247,8 @@ class AISummaryService:
         key_points = [f.get("title", f.get("content", "")[:100]) for f in findings[:5]]
         return {
             "summary": "Key findings: " + "; ".join(key_points[:3]) + ".",
-            "key_points": key_points, "style": "extractive",
-            "ai_generated": False, "source_count": len(findings),
+            "key_points": key_points,
+            "style": "extractive",
+            "ai_generated": False,
+            "source_count": len(findings),
         }

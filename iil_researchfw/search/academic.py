@@ -1,4 +1,5 @@
 """Academic search — async concurrent multi-source."""
+
 from __future__ import annotations
 
 import asyncio
@@ -138,7 +139,12 @@ class AcademicSearchService(AsyncBaseSearchProvider):
         """NCBI E-utilities — free, 3 req/sec without API key."""
         r = await client.get(
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-            params={"db": "pubmed", "term": query, "retmax": min(max_results, 10000), "retmode": "json"},
+            params={
+                "db": "pubmed",
+                "term": query,
+                "retmax": min(max_results, 10000),
+                "retmode": "json",
+            },
         )
         r.raise_for_status()
         ids = r.json().get("esearchresult", {}).get("idlist", [])[:max_results]
@@ -162,7 +168,11 @@ class AcademicSearchService(AsyncBaseSearchProvider):
         """OpenAlex API — free, 100k req/day."""
         response = await client.get(
             "https://api.openalex.org/works",
-            params={"search": query, "per_page": min(max_results, 50), "mailto": "research@iil.pet"},
+            params={
+                "search": query,
+                "per_page": min(max_results, 50),
+                "mailto": "research@iil.pet",
+            },
         )
         response.raise_for_status()
         return self._parse_openalex(response.json())
@@ -193,14 +203,22 @@ class AcademicSearchService(AsyncBaseSearchProvider):
         papers = []
         for entry in root.findall("atom:entry", ns):
             title = (entry.findtext("atom:title", "", ns) or "").strip().replace("\n", " ")
-            authors = [a.findtext("atom:name", "", ns) or "" for a in entry.findall("atom:author", ns)]
+            authors = [
+                a.findtext("atom:name", "", ns) or "" for a in entry.findall("atom:author", ns)
+            ]
             abstract = (entry.findtext("atom:summary", "", ns) or "").strip()
             url = entry.findtext("atom:id", "", ns) or ""
             arxiv_id = url.split("/abs/")[-1] if "/abs/" in url else None
-            papers.append(AcademicPaper(
-                title=title, authors=authors, abstract=abstract[:500],
-                url=url, source="arxiv", arxiv_id=arxiv_id,
-            ))
+            papers.append(
+                AcademicPaper(
+                    title=title,
+                    authors=authors,
+                    abstract=abstract[:500],
+                    url=url,
+                    source="arxiv",
+                    arxiv_id=arxiv_id,
+                )
+            )
         return papers
 
     def _parse_semantic_scholar(self, data: dict[str, Any]) -> list[AcademicPaper]:
@@ -213,7 +231,9 @@ class AcademicSearchService(AsyncBaseSearchProvider):
                 source="semantic_scholar",
                 doi=item.get("externalIds", {}).get("DOI"),
                 publication_date=str(item.get("year", "")),
-                journal=item.get("journal", {}).get("name", "") if item.get("journal") else item.get("venue", ""),
+                journal=item.get("journal", {}).get("name", "")
+                if item.get("journal")
+                else item.get("venue", ""),
                 citation_count=item.get("citationCount"),
                 pdf_url=(item.get("openAccessPdf") or {}).get("url"),
             )
@@ -224,19 +244,21 @@ class AcademicSearchService(AsyncBaseSearchProvider):
         root = ET.fromstring(xml_text)
         papers = []
         for article in root.findall(".//PubmedArticle"):
-            papers.append(AcademicPaper(
-                title=article.findtext(".//ArticleTitle", "") or "",
-                authors=[
-                    f"{a.findtext('LastName', '')} {a.findtext('ForeName', '')}".strip()
-                    for a in article.findall(".//Author")
-                    if a.findtext("LastName")
-                ],
-                abstract=(article.findtext(".//AbstractText", "") or "")[:500],
-                url=f"https://pubmed.ncbi.nlm.nih.gov/{article.findtext('.//PMID', '')}/",
-                source="pubmed",
-                publication_date=article.findtext(".//PubDate/Year", "") or "",
-                journal=article.findtext(".//Journal/Title", "") or "",
-            ))
+            papers.append(
+                AcademicPaper(
+                    title=article.findtext(".//ArticleTitle", "") or "",
+                    authors=[
+                        f"{a.findtext('LastName', '')} {a.findtext('ForeName', '')}".strip()
+                        for a in article.findall(".//Author")
+                        if a.findtext("LastName")
+                    ],
+                    abstract=(article.findtext(".//AbstractText", "") or "")[:500],
+                    url=f"https://pubmed.ncbi.nlm.nih.gov/{article.findtext('.//PMID', '')}/",
+                    source="pubmed",
+                    publication_date=article.findtext(".//PubDate/Year", "") or "",
+                    journal=article.findtext(".//Journal/Title", "") or "",
+                )
+            )
         return papers
 
     def _parse_openalex(self, data: dict[str, Any]) -> list[AcademicPaper]:
@@ -249,21 +271,23 @@ class AcademicSearchService(AsyncBaseSearchProvider):
             src = loc.get("source") or {}
             oa = item.get("open_access", {})
             abstract = self._reconstruct_abstract(item.get("abstract_inverted_index"))
-            papers.append(AcademicPaper(
-                title=item.get("title") or "Unknown",
-                authors=[
-                    auth.get("author", {}).get("display_name", "")
-                    for auth in item.get("authorships", [])[:10]
-                ],
-                abstract=abstract[:500],
-                url=item.get("id", ""),
-                source="openalex",
-                doi=doi or None,
-                publication_date=str(item.get("publication_year", "")),
-                journal=src.get("display_name", ""),
-                citation_count=item.get("cited_by_count"),
-                pdf_url=oa.get("oa_url") if oa.get("is_oa") else None,
-            ))
+            papers.append(
+                AcademicPaper(
+                    title=item.get("title") or "Unknown",
+                    authors=[
+                        auth.get("author", {}).get("display_name", "")
+                        for auth in item.get("authorships", [])[:10]
+                    ],
+                    abstract=abstract[:500],
+                    url=item.get("id", ""),
+                    source="openalex",
+                    doi=doi or None,
+                    publication_date=str(item.get("publication_year", "")),
+                    journal=src.get("display_name", ""),
+                    citation_count=item.get("cited_by_count"),
+                    pdf_url=oa.get("oa_url") if oa.get("is_oa") else None,
+                )
+            )
         return papers
 
     @staticmethod
@@ -297,15 +321,11 @@ class AcademicSearchService(AsyncBaseSearchProvider):
             result.append(p)
         return result
 
-    async def get_references(
-        self, paper_id: str, limit: int = 20
-    ) -> list[AcademicPaper]:
+    async def get_references(self, paper_id: str, limit: int = 20) -> list[AcademicPaper]:
         """Fetch references (papers cited BY this paper) from Semantic Scholar."""
         return await self._fetch_citation_graph(paper_id, "references", limit)
 
-    async def get_citations(
-        self, paper_id: str, limit: int = 20
-    ) -> list[AcademicPaper]:
+    async def get_citations(self, paper_id: str, limit: int = 20) -> list[AcademicPaper]:
         """Fetch citations (papers that CITE this paper) from Semantic Scholar."""
         return await self._fetch_citation_graph(paper_id, "citations", limit)
 
@@ -341,24 +361,27 @@ class AcademicSearchService(AsyncBaseSearchProvider):
                 continue
             ext = p.get("externalIds") or {}
             authors = [a.get("name", "") for a in (p.get("authors") or []) if a.get("name")]
-            papers.append(AcademicPaper(
-                title=p["title"],
-                authors=authors,
-                abstract=p.get("abstract") or "",
-                url=f"https://www.semanticscholar.org/paper/{p.get('paperId', '')}",
-                source="semantic_scholar",
-                doi=ext.get("DOI"),
-                arxiv_id=ext.get("ArXiv"),
-                publication_date=str(p.get("year", "")),
-                journal=(p.get("venue") or ""),
-                citation_count=p.get("citationCount"),
-            ))
+            papers.append(
+                AcademicPaper(
+                    title=p["title"],
+                    authors=authors,
+                    abstract=p.get("abstract") or "",
+                    url=f"https://www.semanticscholar.org/paper/{p.get('paperId', '')}",
+                    source="semantic_scholar",
+                    doi=ext.get("DOI"),
+                    arxiv_id=ext.get("ArXiv"),
+                    publication_date=str(p.get("year", "")),
+                    journal=(p.get("venue") or ""),
+                    citation_count=p.get("citationCount"),
+                )
+            )
         return papers
 
     @staticmethod
     def _normalize_title(title: str) -> str:
         """Lowercase, strip punctuation and extra whitespace."""
         import re
+
         title = title.lower().strip()
         title = re.sub(r"[^\w\s]", "", title)
         return re.sub(r"\s+", " ", title).strip()

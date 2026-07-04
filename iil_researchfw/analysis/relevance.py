@@ -1,4 +1,5 @@
 """Relevance scoring for research results."""
+
 from __future__ import annotations
 
 import math

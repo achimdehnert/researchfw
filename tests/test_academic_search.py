@@ -1,4 +1,5 @@
 """Tests for AcademicSearchService."""
+
 import httpx
 import pytest
 import respx
@@ -9,7 +10,9 @@ from tests.conftest import ARXIV_XML_FIXTURE, OPENALEX_FIXTURE, SEMANTIC_SCHOLAR
 
 def _mock_sources(arxiv_status: int = 200) -> None:
     respx.get("https://export.arxiv.org/api/query").mock(
-        return_value=httpx.Response(arxiv_status, text=ARXIV_XML_FIXTURE if arxiv_status == 200 else "")
+        return_value=httpx.Response(
+            arxiv_status, text=ARXIV_XML_FIXTURE if arxiv_status == 200 else ""
+        )
     )
     respx.get("https://api.semanticscholar.org/graph/v1/paper/search").mock(
         return_value=httpx.Response(200, json=SEMANTIC_SCHOLAR_FIXTURE)
@@ -70,18 +73,22 @@ async def test_semantic_scholar_url_is_web_not_api():
 async def test_semantic_scholar_extracts_journal():
     """S2 parser should extract journal/venue."""
     service = AcademicSearchService(cache_ttl_seconds=0)
-    data = {"data": [{
-        "paperId": "x1",
-        "title": "Test",
-        "authors": [],
-        "abstract": "",
-        "year": 2024,
-        "externalIds": {},
-        "citationCount": 0,
-        "openAccessPdf": None,
-        "journal": {"name": "Nature"},
-        "venue": "Nature Conference",
-    }]}
+    data = {
+        "data": [
+            {
+                "paperId": "x1",
+                "title": "Test",
+                "authors": [],
+                "abstract": "",
+                "year": 2024,
+                "externalIds": {},
+                "citationCount": 0,
+                "openAccessPdf": None,
+                "journal": {"name": "Nature"},
+                "venue": "Nature Conference",
+            }
+        ]
+    }
     papers = service._parse_semantic_scholar(data)
     assert papers[0].journal == "Nature"
 

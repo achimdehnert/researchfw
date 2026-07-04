@@ -1,4 +1,5 @@
 """Tests for CitationService and Citation formatting."""
+
 import httpx
 import pytest
 import respx
@@ -23,9 +24,15 @@ def test_author_ieee():
 
 def test_citation_apa_journal():
     c = Citation(
-        title="Test Article", authors=[Author(family="Smith", given="John")],
-        year=2024, source_type=SourceType.JOURNAL, journal="Journal of Testing",
-        volume="5", issue="2", pages="100-110", doi="10.1234/test",
+        title="Test Article",
+        authors=[Author(family="Smith", given="John")],
+        year=2024,
+        source_type=SourceType.JOURNAL,
+        journal="Journal of Testing",
+        volume="5",
+        issue="2",
+        pages="100-110",
+        doi="10.1234/test",
     )
     result = c.format(CitationStyle.APA)
     assert "Smith" in result and "2024" in result and "Journal of Testing" in result
@@ -42,8 +49,11 @@ def test_citation_in_text_two_authors():
 
 def test_citation_to_bibtex():
     c = Citation(
-        title="Test", authors=[Author(family="Smith", given="J")],
-        year=2024, journal="J", doi="10.1234/test",
+        title="Test",
+        authors=[Author(family="Smith", given="J")],
+        year=2024,
+        journal="J",
+        doi="10.1234/test",
     )
     bibtex = c.to_bibtex()
     assert "@article" in bibtex and "10.1234/test" in bibtex
@@ -70,8 +80,6 @@ async def test_from_doi_resolves():
 @pytest.mark.asyncio
 async def test_from_doi_returns_none_on_404():
     with respx.mock:
-        respx.get("https://api.crossref.org/works/invalid").mock(
-            return_value=httpx.Response(404)
-        )
+        respx.get("https://api.crossref.org/works/invalid").mock(return_value=httpx.Response(404))
         result = await CitationService().from_doi("invalid")
     assert result is None
