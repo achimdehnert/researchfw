@@ -1,4 +1,5 @@
 """Tests for AISummaryService and make_together_llm."""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -90,9 +91,7 @@ async def test_make_together_llm_no_key():
 @pytest.mark.asyncio
 async def test_make_together_llm_with_key():
     mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "choices": [{"message": {"content": "Generated summary"}}]
-    }
+    mock_response.json.return_value = {"choices": [{"message": {"content": "Generated summary"}}]}
     mock_response.raise_for_status = MagicMock()
 
     with patch("httpx.AsyncClient") as mock_client_cls:

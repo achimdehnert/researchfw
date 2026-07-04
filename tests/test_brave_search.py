@@ -1,4 +1,5 @@
 """Tests for BraveSearchService."""
+
 import httpx
 import pytest
 import respx
@@ -7,11 +8,15 @@ from iil_researchfw.core.exceptions import RateLimitError
 from iil_researchfw.search.brave import BraveSearchService
 
 BRAVE_RESPONSE = {
-    "web": {"results": [{
-        "title": "Python Async Guide",
-        "url": "https://example.com/async",
-        "description": "Best practices for async Python.",
-    }]}
+    "web": {
+        "results": [
+            {
+                "title": "Python Async Guide",
+                "url": "https://example.com/async",
+                "description": "Best practices for async Python.",
+            }
+        ]
+    }
 }
 
 

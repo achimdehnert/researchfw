@@ -1,4 +1,5 @@
 """ResearchService — async orchestrator for search + analysis."""
+
 from __future__ import annotations
 
 import logging
@@ -72,7 +73,9 @@ class ResearchService:
     async def fact_check(self, claim: str, sources: int = 3) -> ResearchOutput:
         """Verify a claim against web sources."""
         output = await self.research(f"fact check: {claim}", {"max_sources": sources})
-        return output.model_copy(update={"metadata": {**output.metadata, "claim": claim, "type": "fact_check"}})
+        return output.model_copy(
+            update={"metadata": {**output.metadata, "claim": claim, "type": "fact_check"}}
+        )
 
     async def _web_results(self, ctx: ResearchContext) -> list[Source]:
         if not self._web_search:

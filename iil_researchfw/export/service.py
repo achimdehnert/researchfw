@@ -1,4 +1,5 @@
 """Research export — Markdown, LaTeX, BibTeX, DOCX."""
+
 from __future__ import annotations
 
 import logging
@@ -19,7 +20,8 @@ class ResearchExportService:
 
     def export_markdown(self, project: ResearchProjectProtocol) -> str:
         lines = [
-            f"# {project.name}", "",
+            f"# {project.name}",
+            "",
             f"**Query:** {project.query}",
             f"**Date:** {project.created_at.strftime('%Y-%m-%d')}",
             "",
@@ -56,8 +58,13 @@ class ResearchExportService:
             "",
             rf"\title{{{self._latex_escape(project.name)}}}",
             rf"\date{{{date_str}}}",
-            "", r"\begin{document}", r"\maketitle", "",
-            r"\section*{Research Query}", self._latex_escape(project.query), "",
+            "",
+            r"\begin{document}",
+            r"\maketitle",
+            "",
+            r"\section*{Research Query}",
+            self._latex_escape(project.query),
+            "",
         ]
         findings = list(project.findings)
         if findings:
@@ -65,7 +72,11 @@ class ResearchExportService:
             for f in findings:
                 title = getattr(f, "title", "Finding")
                 content = getattr(f, "content", "")
-                lines += [rf"\subsection*{{{self._latex_escape(title)}}}", self._latex_escape(content), ""]
+                lines += [
+                    rf"\subsection*{{{self._latex_escape(title)}}}",
+                    self._latex_escape(content),
+                    "",
+                ]
         sources = list(project.sources)
         if sources:
             lines += [r"\section*{Sources}", r"\begin{enumerate}"]
@@ -96,7 +107,9 @@ class ResearchExportService:
         try:
             from docx import Document  # type: ignore[import-untyped]
         except ImportError as exc:
-            raise ExportError("python-docx not installed. Run: pip install iil-researchfw[export]") from exc
+            raise ExportError(
+                "python-docx not installed. Run: pip install iil-researchfw[export]"
+            ) from exc
 
         doc = Document()
         doc.add_heading(project.name, 0)
@@ -121,9 +134,16 @@ class ResearchExportService:
 
     def _latex_escape(self, text: str) -> str:
         for old, new in [
-            ("\\", r"\textbackslash{}"), ("&", r"\&"), ("%", r"\%"),
-            ("$", r"\$"), ("#", r"\#"), ("_", r"\_"), ("{", r"\{"),
-            ("}", r"\}"), ("~", r"\textasciitilde{}"), ("^", r"\textasciicircum{}"),
+            ("\\", r"\textbackslash{}"),
+            ("&", r"\&"),
+            ("%", r"\%"),
+            ("$", r"\$"),
+            ("#", r"\#"),
+            ("_", r"\_"),
+            ("{", r"\{"),
+            ("}", r"\}"),
+            ("~", r"\textasciitilde{}"),
+            ("^", r"\textasciicircum{}"),
         ]:
             text = text.replace(old, new)
         return text

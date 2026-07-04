@@ -1,4 +1,5 @@
 """Smart search — LLM-powered query expansion + relevance scoring (ADR-160)."""
+
 from __future__ import annotations
 
 import json
@@ -158,7 +159,11 @@ class SmartSearchService:
             new_papers = await self._search_queries(gap_queries, sources, max_results)
             new_papers = self._academic._deduplicate(all_papers + new_papers)
             existing_titles = {self._academic._normalize_title(s.paper.title) for s in filtered}
-            truly_new = [p for p in new_papers if self._academic._normalize_title(p.title) not in existing_titles]
+            truly_new = [
+                p
+                for p in new_papers
+                if self._academic._normalize_title(p.title) not in existing_titles
+            ]
             if not truly_new:
                 break
             new_scored = await self._score_relevance(truly_new, topic)
@@ -167,14 +172,18 @@ class SmartSearchService:
             filtered.sort(key=lambda s: s.relevance_score, reverse=True)
             all_papers.extend(truly_new)
             result.total_found = len(all_papers)
-            logger.info("SmartSearch: round %d added %d new relevant papers", round_num, len(new_filtered))
+            logger.info(
+                "SmartSearch: round %d added %d new relevant papers", round_num, len(new_filtered)
+            )
 
         # Step 7: Citation graph expansion (Option D)
         if self._expand_citations and filtered:
             citation_papers = await self._expand_via_citations(filtered[:5])
             if citation_papers:
                 citation_scored = await self._score_relevance(citation_papers, topic)
-                citation_filtered = [s for s in citation_scored if s.relevance_score >= self._relevance_threshold]
+                citation_filtered = [
+                    s for s in citation_scored if s.relevance_score >= self._relevance_threshold
+                ]
                 existing_titles = {self._academic._normalize_title(s.paper.title) for s in filtered}
                 for sp in citation_filtered:
                     norm = self._academic._normalize_title(sp.paper.title)
@@ -183,7 +192,10 @@ class SmartSearchService:
                         existing_titles.add(norm)
                 filtered.sort(key=lambda s: s.relevance_score, reverse=True)
                 result.total_found += len(citation_papers)
-                logger.info("SmartSearch: citation expansion added %d relevant papers", len(citation_filtered))
+                logger.info(
+                    "SmartSearch: citation expansion added %d relevant papers",
+                    len(citation_filtered),
+                )
 
         result.papers = filtered[:max_results]
         result.total_after_filter = len(filtered)
@@ -206,7 +218,9 @@ class SmartSearchService:
         all_papers: list[AcademicPaper] = []
         for query in queries:
             papers = await self._academic.search(
-                query=query, sources=sources, max_results=max_results,
+                query=query,
+                sources=sources,
+                max_results=max_results,
             )
             all_papers.extend(papers)
         return all_papers
@@ -226,9 +240,7 @@ class SmartSearchService:
             logger.warning("SmartSearch: query expansion LLM error: %s", exc)
         return [topic]
 
-    async def _score_relevance(
-        self, papers: list[AcademicPaper], topic: str
-    ) -> list[ScoredPaper]:
+    async def _score_relevance(self, papers: list[AcademicPaper], topic: str) -> list[ScoredPaper]:
         """Score papers in batches using LLM."""
         all_scored: list[ScoredPaper] = []
 
@@ -279,17 +291,17 @@ class SmartSearchService:
             logger.warning("SmartSearch: relevance scoring LLM error (batch %d): %s", offset, exc)
 
         # Fallback: return all papers with score 5 (neutral) so they aren't lost
-        return [ScoredPaper(paper=p, relevance_score=5.0, relevance_reason="LLM scoring failed") for p in papers]
+        return [
+            ScoredPaper(paper=p, relevance_score=5.0, relevance_reason="LLM scoring failed")
+            for p in papers
+        ]
 
-    async def _analyze_gaps(
-        self, current_papers: list[ScoredPaper], topic: str
-    ) -> list[str]:
+    async def _analyze_gaps(self, current_papers: list[ScoredPaper], topic: str) -> list[str]:
         """Use LLM to identify gaps in current results and generate new queries."""
         if not current_papers:
             return []
         papers_summary = "\n".join(
-            f"- {sp.paper.title} (score: {sp.relevance_score})"
-            for sp in current_papers[:15]
+            f"- {sp.paper.title} (score: {sp.relevance_score})" for sp in current_papers[:15]
         )
         prompt = GAP_ANALYSIS_PROMPT.format(
             topic=topic,
@@ -308,9 +320,7 @@ class SmartSearchService:
             logger.warning("SmartSearch: gap analysis LLM error: %s", exc)
         return []
 
-    async def _expand_via_citations(
-        self, top_papers: list[ScoredPaper]
-    ) -> list[AcademicPaper]:
+    async def _expand_via_citations(self, top_papers: list[ScoredPaper]) -> list[AcademicPaper]:
         """Follow citation graph of top papers to find seminal works."""
         all_citation_papers: list[AcademicPaper] = []
         seen_ids: set[str] = set()

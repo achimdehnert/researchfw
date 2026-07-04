@@ -1,4 +1,5 @@
 """Tests for RateLimiter."""
+
 import time
 
 import pytest

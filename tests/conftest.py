@@ -12,30 +12,34 @@ ARXIV_XML_FIXTURE = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 SEMANTIC_SCHOLAR_FIXTURE = {
-    "data": [{
-        "paperId": "abc123",
-        "title": "Deep Learning Survey",
-        "authors": [{"name": "LeCun, Yann"}],
-        "abstract": "A survey of deep learning methods.",
-        "year": 2024,
-        "externalIds": {"DOI": "10.1234/dl-survey"},
-        "citationCount": 100,
-        "openAccessPdf": None,
-    }]
+    "data": [
+        {
+            "paperId": "abc123",
+            "title": "Deep Learning Survey",
+            "authors": [{"name": "LeCun, Yann"}],
+            "abstract": "A survey of deep learning methods.",
+            "year": 2024,
+            "externalIds": {"DOI": "10.1234/dl-survey"},
+            "citationCount": 100,
+            "openAccessPdf": None,
+        }
+    ]
 }
 
 OPENALEX_FIXTURE = {
-    "results": [{
-        "id": "https://openalex.org/W123",
-        "title": "Transformer Architecture Review",
-        "authorships": [{"author": {"display_name": "Vaswani, Ashish"}}],
-        "doi": "https://doi.org/10.5678/transformer",
-        "publication_year": 2023,
-        "cited_by_count": 50,
-        "open_access": {"is_oa": False},
-        "primary_location": {"source": {"display_name": "NeurIPS"}},
-        "abstract_inverted_index": {"A": [0], "review": [1], "of": [2], "transformers": [3]},
-    }]
+    "results": [
+        {
+            "id": "https://openalex.org/W123",
+            "title": "Transformer Architecture Review",
+            "authorships": [{"author": {"display_name": "Vaswani, Ashish"}}],
+            "doi": "https://doi.org/10.5678/transformer",
+            "publication_year": 2023,
+            "cited_by_count": 50,
+            "open_access": {"is_oa": False},
+            "primary_location": {"source": {"display_name": "NeurIPS"}},
+            "abstract_inverted_index": {"A": [0], "review": [1], "of": [2], "transformers": [3]},
+        }
+    ]
 }
 
 CROSSREF_FIXTURE = {
@@ -48,7 +52,9 @@ CROSSREF_FIXTURE = {
         "published": {"date-parts": [[2024]]},
         "type": "journal-article",
         "container-title": ["Journal of Testing"],
-        "volume": "10", "issue": "2", "page": "100-110",
+        "volume": "10",
+        "issue": "2",
+        "page": "100-110",
         "publisher": "Test Publisher",
         "DOI": "10.1234/test",
         "URL": "https://doi.org/10.1234/test",

@@ -1,4 +1,5 @@
 """In-memory TTL + LRU cache for research results."""
+
 from __future__ import annotations
 
 import hashlib

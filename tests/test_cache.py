@@ -1,4 +1,5 @@
 """Tests for TTLCache."""
+
 import time
 
 from iil_researchfw._internal.cache import TTLCache

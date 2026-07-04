@@ -1,4 +1,5 @@
 """Tests for RelevanceScorer."""
+
 from iil_researchfw.analysis.relevance import RelevanceScorer
 
 
