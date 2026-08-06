@@ -17,6 +17,22 @@ from iil_researchfw.search.base import AsyncBaseSearchProvider
 
 logger = logging.getLogger(__name__)
 
+#: Fehler, bei denen ein zweiter Anlauf sinnvoll ist.
+#:
+#: ``RateLimitError`` MUSS hier stehen. Bis 2026-08-06 fingen die Decorator nur
+#: ``httpx.HTTPStatusError`` — die Registerfunktionen werfen bei 429 aber
+#: ``RateLimitError`` **vor** ``raise_for_status()``, und ``RateLimitError``
+#: stammt von ``ResearchError``, nicht von httpx. Der Wiederholungsversuch
+#: feuerte damit ausgerechnet fuer den Fall nicht, fuer den er dem Namen nach da
+#: ist: ein einziger 429 beendete das Register fuer den gesamten Lauf.
+#:
+#: Belegt durch einen A/B-Vergleich bei gleichem Code und gleichen vier
+#: Suchbegriffen (writing-hub#517): bei 403 (also HTTPStatusError) liefen 12
+#: Anfragen, das sind drei Versuche je Begriff; bei 429 nur 4, also einer. Im
+#: selben Lauf fielen 2 von 4 Begriffen aus, die der vorhandene Backoff
+#: (1 s, dann 2 s) mit hoher Wahrscheinlichkeit gerettet haette.
+WIEDERHOLBAR = (httpx.HTTPStatusError, RateLimitError)
+
 
 @dataclass
 class AcademicPaper:
@@ -88,7 +104,7 @@ class AcademicSearchService(AsyncBaseSearchProvider):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type(httpx.HTTPStatusError),
+        retry=retry_if_exception_type(WIEDERHOLBAR),
     )
     async def _search_arxiv(
         self, client: httpx.AsyncClient, query: str, max_results: int
@@ -104,7 +120,7 @@ class AcademicSearchService(AsyncBaseSearchProvider):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type(httpx.HTTPStatusError),
+        retry=retry_if_exception_type(WIEDERHOLBAR),
     )
     async def _search_semantic_scholar(
         self, client: httpx.AsyncClient, query: str, max_results: int
@@ -131,7 +147,7 @@ class AcademicSearchService(AsyncBaseSearchProvider):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=2, min=2, max=15),
-        retry=retry_if_exception_type(httpx.HTTPStatusError),
+        retry=retry_if_exception_type(WIEDERHOLBAR),
     )
     async def _search_pubmed(
         self, client: httpx.AsyncClient, query: str, max_results: int
@@ -160,7 +176,7 @@ class AcademicSearchService(AsyncBaseSearchProvider):
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=10),
-        retry=retry_if_exception_type(httpx.HTTPStatusError),
+        retry=retry_if_exception_type(WIEDERHOLBAR),
     )
     async def _search_openalex(
         self, client: httpx.AsyncClient, query: str, max_results: int
