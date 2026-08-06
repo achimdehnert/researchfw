@@ -5,6 +5,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.1] — 2026-08-06
+
+### Fixed
+- **Der Wiederholungsversuch greift jetzt auch bei 429** (#16). Die `@retry`-Decorator
+  in `academic.py` fingen ausschließlich `httpx.HTTPStatusError`; die Registerfunktionen
+  werfen bei 429 aber `RateLimitError` — und zwar **vor** `raise_for_status()`.
+  `RateLimitError` stammt von `ResearchError`, nicht von httpx, also feuerte der
+  Mechanismus ausgerechnet für den Fall nicht, für den er dem Namen nach da ist.
+  Ein einziger 429 beendete das Register für den gesamten Lauf.
+
+  Belegt durch einen A/B-Vergleich bei gleichem Code und gleichen vier Suchbegriffen
+  (achimdehnert/writing-hub#517): bei `403` (→ `HTTPStatusError`) liefen 12 Anfragen,
+  also drei Versuche je Begriff; bei `429` nur 4, also einer. Der Backoff selbst
+  funktionierte einwandfrei — er war nur für eine Fehlerart blind.
+
+  Betroffen waren **vier** Registerfunktionen, nicht nur die auffällige: `_search_arxiv`
+  wirft denselben Fehler, dort fällt es nur nicht auf, weil arXiv selten drosselt. Die
+  gemeinsame Konstante `WIEDERHOLBAR` hält beide Fehlerarten an einer Stelle.
+
+  In Produktion nachgemessen (writing-hub): ohne Wiederholung **1 von 4** Anfragen
+  erfolgreich, mit Wiederholung **4 von 4**.
+- 7 neue Tests, davon zwei Gegenproben: der alte Filter wiederholt einen 429
+  nachweislich **nicht**, und ein AST-Test prüft **alle** Registerfunktionen statt nur
+  der einen, die aufgefallen ist. (96 gesamt)
+
+---
+
 ## [0.6.0] — 2026-04-09
 
 ### Added
