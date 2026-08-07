@@ -5,6 +5,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.2] — 2026-08-07
+
+### Added
+- **Verworfene Treffer sind Teil des Ergebnisses** (writing-hub#501, KONZ-010 R5):
+  `SmartSearchResult.rejected` traegt die aussortierten Treffer mit Score und
+  LLM-Begruendung, `ScoredPaper.rejection` nennt den Grund
+  (`below_threshold` | `over_max_results`).
+  - Vorher gab der Dienst nur die uebernommenen Treffer heraus. Ein Lauf mit 131
+    Funden und 10 Treffern war damit nicht von einem Lauf mit 10 Funden zu
+    unterscheiden — eine Auswahl, die sich als Fund ausgibt.
+  - `_split_by_threshold()` buendelt die Trennung, die im Ablauf dreimal vorkommt
+    (Erstlauf, Gap-Runden, Zitationsexpansion). An einer Stelle vergessen waere
+    das Protokoll still unvollstaendig.
+- 4 Tests, darunter die Gegenprobe „uebernommen + verworfen = alles Bewertete".
+
+### Compatibility
+- Rein additiv. Beide Felder haben Defaults; Bestandscode, der sie nicht kennt,
+  laeuft unveraendert.
+
+---
+
+## [0.6.1] — 2026-08-06
+
+*Nachgetragen am 2026-08-07 — der Eintrag fehlte.*
+
+### Fixed
+- **Wiederholungsversuch greift auch bei 429** (#16): `RateLimitError` wird vor
+  `raise_for_status()` geworfen und war deshalb vom Retry-Filter nicht erfasst.
+  Ein einziger transienter 429 beendete das Register fuer den ganzen Lauf.
+
+---
+
 ## [0.6.0] — 2026-04-09
 
 ### Added

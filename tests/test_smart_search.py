@@ -486,3 +486,89 @@ async def test_full_pipeline_all_features():
     assert result.total_found > 0
     assert len(result.queries_used) > 3
     assert result.search_duration_seconds > 0
+
+
+# --- writing-hub#501 / KONZ-010 R5: Verworfene sichtbar machen ---
+
+
+@pytest.mark.asyncio
+async def test_rejected_papers_are_returned_with_reason():
+    """Unterhalb der Schwelle heisst aussortiert, nicht verschwunden.
+
+    Vorher trug `SmartSearchResult` nur die uebernommenen Treffer. Ein Lauf mit
+    131 Funden und 10 Treffern sah damit aus wie ein Lauf mit 10 Funden — eine
+    Auswahl, die sich als Fund ausgibt (writing-hub#501).
+    """
+    with respx.mock:
+        _mock_sources()
+        service = SmartSearchService(
+            llm_fn=_mock_llm_good,
+            academic_service=AcademicSearchService(cache_ttl_seconds=0),
+            relevance_threshold=7.0,
+        )
+        result = await service.search("machine learning")
+
+    assert result.rejected, "Der Mock scored ein Paper mit 3 — es muss in `rejected` auftauchen"
+    schwach = [s for s in result.rejected if s.rejection == "below_threshold"]
+    assert schwach, "Ein Ausschluss ohne Grund ist so blind wie gar keiner"
+    assert all(s.relevance_score < 7.0 for s in schwach)
+    assert all(s.relevance_reason for s in schwach), "Der LLM-Grund muss mitkommen"
+
+
+@pytest.mark.asyncio
+async def test_kept_and_rejected_together_are_everything_that_was_scored():
+    """Gegenprobe: kein Treffer faellt zwischen die beiden Listen.
+
+    Ohne diese Zusicherung koennte `rejected` teilweise befuellt sein und der
+    Rest weiter spurlos verschwinden — der Fehler saehe dann behoben aus.
+    """
+    with respx.mock:
+        _mock_sources()
+        service = SmartSearchService(
+            llm_fn=_mock_llm_good,
+            academic_service=AcademicSearchService(cache_ttl_seconds=0),
+            relevance_threshold=7.0,
+        )
+        result = await service.search("machine learning")
+
+    titel_uebernommen = {s.paper.title for s in result.papers}
+    titel_verworfen = {s.paper.title for s in result.rejected}
+    assert not (titel_uebernommen & titel_verworfen), "Ein Treffer kann nicht beides sein"
+    assert len(titel_uebernommen | titel_verworfen) == result.total_found
+
+
+class _ErgiebigeSuche(AcademicSearchService):
+    """Liefert mehr Treffer, als `max_results` durchlaesst.
+
+    Noetig, weil die HTTP-Fixtures hoechstens drei Papers hergeben und
+    `max_results` zugleich die Abfrage begrenzt — der Abschneide-Pfad ist ueber
+    die Fixtures allein gar nicht erreichbar.
+    """
+
+    async def search(self, query, sources=None, max_results=10):  # noqa: ARG002
+        return [
+            AcademicPaper(title=f"Paper {i}", authors=["A"], abstract="x", publication_date="2024")
+            for i in range(6)
+        ]
+
+
+@pytest.mark.asyncio
+async def test_papers_cut_off_by_max_results_are_rejected_too():
+    """Auch das Abschneiden ist ein Ausschluss — mit eigenem Grund."""
+    service = SmartSearchService(
+        llm_fn=_mock_llm_good,
+        academic_service=_ErgiebigeSuche(cache_ttl_seconds=0),
+        relevance_threshold=0.0,
+    )
+    result = await service.search("machine learning", max_results=2)
+
+    abgeschnitten = [s for s in result.rejected if s.rejection == "over_max_results"]
+    assert len(result.papers) == 2
+    assert abgeschnitten, "Was ueber max_results hinausgeht, muss protokolliert sein"
+    assert len(result.papers) + len(abgeschnitten) == result.total_after_filter
+
+
+def test_rejected_defaults_to_empty():
+    """Bestandscode, der `rejected` nicht kennt, darf nicht brechen."""
+    assert SmartSearchResult().rejected == []
+    assert ScoredPaper(paper=None).rejection == ""

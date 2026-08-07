@@ -58,6 +58,12 @@ Scoring guide:
 Return ONLY valid JSON array: [{{"index": 0, "score": 8, "reason": "brief reason"}}, ...]"""
 
 
+#: Ein Treffer lag unter `relevance_threshold`.
+REJECTED_BELOW_THRESHOLD = "below_threshold"
+#: Ein Treffer war relevant genug, fiel aber aus `max_results` heraus.
+REJECTED_OVER_MAX_RESULTS = "over_max_results"
+
+
 @dataclass
 class ScoredPaper:
     """Academic paper with LLM-assigned relevance score."""
@@ -65,17 +71,29 @@ class ScoredPaper:
     paper: AcademicPaper
     relevance_score: float = 0.0
     relevance_reason: str = ""
+    #: Leer bei uebernommenen Treffern; sonst einer der REJECTED_*-Werte.
+    rejection: str = ""
 
 
 @dataclass
 class SmartSearchResult:
-    """Result from SmartSearchService including metadata."""
+    """Result from SmartSearchService including metadata.
+
+    `papers` sind die uebernommenen Treffer, `rejected` die aussortierten — mit
+    Score und Begruendung, also nachvollziehbar statt bloss gezaehlt.
+
+    Warum das Feld existiert: Wer nur `papers` sieht, kann eine **Auswahl** nicht
+    von einem **Fund** unterscheiden. Ein Lauf, der 131 Treffer holt und 10 behaelt,
+    sah bisher genauso aus wie einer, der 10 gefunden hat (writing-hub#501).
+    """
 
     papers: list[ScoredPaper] = field(default_factory=list)
     queries_used: list[str] = field(default_factory=list)
     total_found: int = 0
     total_after_filter: int = 0
     search_duration_seconds: float = 0.0
+    #: Aussortierte Treffer, jeweils mit gesetztem `rejection`.
+    rejected: list[ScoredPaper] = field(default_factory=list)
 
 
 class SmartSearchService:
@@ -146,7 +164,8 @@ class SmartSearchService:
         scored = await self._score_relevance(all_papers, topic)
 
         # Step 5: Filter by threshold
-        filtered = [s for s in scored if s.relevance_score >= self._relevance_threshold]
+        filtered, verworfen = self._split_by_threshold(scored)
+        result.rejected.extend(verworfen)
         filtered.sort(key=lambda s: s.relevance_score, reverse=True)
 
         # Step 6: Iterative gap analysis (Option C)
@@ -167,7 +186,8 @@ class SmartSearchService:
             if not truly_new:
                 break
             new_scored = await self._score_relevance(truly_new, topic)
-            new_filtered = [s for s in new_scored if s.relevance_score >= self._relevance_threshold]
+            new_filtered, new_verworfen = self._split_by_threshold(new_scored)
+            result.rejected.extend(new_verworfen)
             filtered.extend(new_filtered)
             filtered.sort(key=lambda s: s.relevance_score, reverse=True)
             all_papers.extend(truly_new)
@@ -181,9 +201,8 @@ class SmartSearchService:
             citation_papers = await self._expand_via_citations(filtered[:5])
             if citation_papers:
                 citation_scored = await self._score_relevance(citation_papers, topic)
-                citation_filtered = [
-                    s for s in citation_scored if s.relevance_score >= self._relevance_threshold
-                ]
+                citation_filtered, citation_verworfen = self._split_by_threshold(citation_scored)
+                result.rejected.extend(citation_verworfen)
                 existing_titles = {self._academic._normalize_title(s.paper.title) for s in filtered}
                 for sp in citation_filtered:
                     norm = self._academic._normalize_title(sp.paper.title)
@@ -198,18 +217,45 @@ class SmartSearchService:
                 )
 
         result.papers = filtered[:max_results]
+        # Auch das Abschneiden ist ein Ausschluss — nur mit anderem Grund. Ohne diese
+        # Zeile faenden sich die ueber `max_results` verlorenen Treffer nirgends wieder,
+        # obwohl sie die Schwelle bestanden haben.
+        for sp in filtered[max_results:]:
+            sp.rejection = REJECTED_OVER_MAX_RESULTS
+            result.rejected.append(sp)
         result.total_after_filter = len(filtered)
         result.search_duration_seconds = time.monotonic() - t0
 
         logger.info(
-            "SmartSearch: %d found -> %d after filter (%.1fs, %d rounds, citations=%s)",
+            "SmartSearch: %d found -> %d after filter, %d rejected (%.1fs, %d rounds, citations=%s)",
             result.total_found,
             result.total_after_filter,
+            len(result.rejected),
             result.search_duration_seconds,
             self._search_rounds,
             self._expand_citations,
         )
         return result
+
+    def _split_by_threshold(
+        self, scored: list[ScoredPaper]
+    ) -> tuple[list[ScoredPaper], list[ScoredPaper]]:
+        """(uebernommen, verworfen) — die Verworfenen tragen ihren Grund mit.
+
+        Die Trennung liegt an einer Stelle, weil sie im Ablauf dreimal vorkommt
+        (Erstlauf, Gap-Runden, Zitationsexpansion). Fehlte sie an einer davon,
+        waere die Protokollierung still unvollstaendig — genau die Klasse von
+        Luecke, gegen die dieses Feld antritt.
+        """
+        kept: list[ScoredPaper] = []
+        rejected: list[ScoredPaper] = []
+        for sp in scored:
+            if sp.relevance_score >= self._relevance_threshold:
+                kept.append(sp)
+            else:
+                sp.rejection = REJECTED_BELOW_THRESHOLD
+                rejected.append(sp)
+        return kept, rejected
 
     async def _search_queries(
         self, queries: list[str], sources: list[str] | None, max_results: int
