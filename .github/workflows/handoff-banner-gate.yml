@@ -1,0 +1,28 @@
+name: Handoff-Banner-Gate
+
+# Ruft den zentralen Gate-Workflow aus shared-ci auf (reusable `workflow_call`) — Rezenz-Check
+# für AGENT_HANDOVER.md, Gate `handover-stale-vor-merge`. Einzige Quelle der Wahrheit ist
+# iilgmbh/shared-ci:.github/workflows/handoff-banner-gate.yml; hier steht bewusst nur der Aufruf,
+# damit eine Änderung am Gate nicht in 18 Repos einzeln nachgezogen werden muss.
+#
+# Warum dieses Repo: die Flotten-Messung `tools/handover_fleet_check.py --gate` (platform#1954)
+# führt es als "AGENT_HANDOVER.md vorhanden, Frische-Gate fehlt" — Rollout gemäß
+# platform#1945 Kriterium 2.
+#
+# Grenze, die dieses Gate NICHT deckt: es greift nur, wenn eine PR AGENT_HANDOVER.md anfasst
+# (paths-Filter unten). Eine PR, die ein Issue schließt und den Handover unberührt lässt,
+# hinterlässt weiterhin einen veralteten Stand. Genau dieser Failure-Mode ist der Grund für den
+# Stale-Referenz-Melder aus platform#1945 Kriterium 3 — das Gate hier ersetzt ihn nicht.
+
+on:
+  pull_request:
+    paths:
+      - 'AGENT_HANDOVER.md'
+      - '**/AGENT_HANDOVER.md'
+
+permissions:
+  contents: read
+
+jobs:
+  handoff-banner:
+    uses: iilgmbh/shared-ci/.github/workflows/handoff-banner-gate.yml@v1.1.7
