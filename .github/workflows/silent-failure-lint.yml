@@ -1,9 +1,7 @@
 name: Silent-Failure-Lint
 
-# Konsumiert platform:tools/check_silent_failures.py (SSoT) — Gate gegen
+# Konsumiert iilgmbh/shared-ci:tools/check_silent_failures.py (SSoT, via workflow-guards) — Gate gegen
 # Melder, die beim Ausfall schweigen (Anlass: platform#1587).
-# Direkt-Checkout statt workflow_call: der platform-Reusable checkt nur den
-# Caller aus und faende das Tool dort nicht (Stand 2026-08-02).
 on:
   pull_request:
     paths: [".github/workflows/**"]
@@ -20,11 +18,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/checkout@v7
-        with:
-          repository: achimdehnert/platform
-          path: _platform
-      - run: python3 -m pip install --quiet pyyaml
+      # Prüfer liegt im CI-Kanon iilgmbh/shared-ci (platform wird privat, platform#3234).
       # Bewusst NICHT weichgestellt: ein Gate, das seinen eigenen Fehlschlag
       # verschluckt, waere genau der Fehler, den es sucht.
-      - run: python3 _platform/tools/check_silent_failures.py .github/workflows
+      - uses: iilgmbh/shared-ci/.github/actions/workflow-guards@main
+        with:
+          checks: silent-failures
+          workflows_dir: .github/workflows
