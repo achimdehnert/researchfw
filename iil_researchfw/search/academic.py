@@ -12,6 +12,7 @@ import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from iil_researchfw._internal.cache import TTLCache
+from iil_researchfw._internal.rate_limiter import RateLimiter
 from iil_researchfw.core.exceptions import RateLimitError
 from iil_researchfw.search.base import AsyncBaseSearchProvider
 
@@ -31,7 +32,27 @@ logger = logging.getLogger(__name__)
 #: Anfragen, das sind drei Versuche je Begriff; bei 429 nur 4, also einer. Im
 #: selben Lauf fielen 2 von 4 Begriffen aus, die der vorhandene Backoff
 #: (1 s, dann 2 s) mit hoher Wahrscheinlichkeit gerettet haette.
+#:
+#: 406 kam am 2026-09-23 dazu (writing-hub#1261 K2): arXiv antwortet 406 auf
+#: parallele Mehrwort-Anfragen, wenig spaeter 200 auf dieselbe Anfrage — die
+#: Registerfunktionen werfen ``RateLimitError`` dafuer explizit vor
+#: ``raise_for_status()`` (statt sich auf das implizite ``HTTPStatusError``
+#: zu verlassen), damit der Fall genauso sichtbar wird wie 429.
 WIEDERHOLBAR = (httpx.HTTPStatusError, RateLimitError)
+
+#: Mindestabstand in Sekunden zwischen zwei Anfragen an dieselbe Quelle
+#: (per-Quelle Drossel, writing-hub#1261 K2). arXiv verlangt laut API-Terms
+#: hoechstens eine Anfrage je 3 Sekunden; Semantic Scholar drosselt auf ~1
+#: Anfrage/Sekunde (auch mit Schluessel). OpenAlex (Doku: "polite pool" mit
+#: ``mailto`` vertraegt ~10 req/s) und PubMed/NCBI E-utilities (Doku: 3 req/s
+#: ohne API-Key) bekommen die aus ihrer jeweiligen Doku abgeleiteten
+#: Mindestabstaende. Alles andere (Default 0.0) bleibt ungedrosselt.
+DEFAULT_RATE_LIMITS: dict[str, float] = {
+    "arxiv": 3.0,
+    "semantic_scholar": 1.0,
+    "openalex": 0.1,
+    "pubmed": 0.34,
+}
 
 
 @dataclass
@@ -54,7 +75,13 @@ class AcademicSearchService(AsyncBaseSearchProvider):
     """
     Concurrent multi-source academic search.
 
-    All source calls run in parallel via asyncio.gather().
+    All source calls run in parallel via asyncio.gather() — parallelism
+    ACROSS sources. WITHIN a source, requests are serialised through a
+    per-source ``RateLimiter`` (see ``rate_limits``/``DEFAULT_RATE_LIMITS``),
+    which also applies on tenacity retries — arXiv and Semantic Scholar both
+    throttle harder than the default exponential backoff alone respects
+    (writing-hub#1261 K2).
+
     Per-source failures are isolated — partial results are returned.
     """
 
@@ -62,9 +89,28 @@ class AcademicSearchService(AsyncBaseSearchProvider):
         self,
         cache_ttl_seconds: int = 3600,
         semantic_scholar_api_key: str | None = None,
+        rate_limits: dict[str, float] | None = None,
     ) -> None:
         self._cache: TTLCache[list[AcademicPaper]] = TTLCache(ttl_seconds=cache_ttl_seconds)
         self._s2_api_key = semantic_scholar_api_key
+        #: Mindestabstand je Quelle in Sekunden — ueberschreibt/ergaenzt
+        #: ``DEFAULT_RATE_LIMITS``, ungenannte Quellen bleiben bei 0.0.
+        self._rate_limits: dict[str, float] = {**DEFAULT_RATE_LIMITS, **(rate_limits or {})}
+        self._rate_limiters: dict[str, RateLimiter] = {}
+
+    def _limiter(self, source: str) -> RateLimiter:
+        """Ein RateLimiter je Quelle, lazy angelegt und je Instanz wiederverwendet.
+
+        Dieselbe Instanz je Quelle ist der Punkt: sie serialisiert Aufrufe
+        *innerhalb* der Quelle, auch wenn ``asyncio.gather`` sie mit anderen
+        Quellen parallel startet — Parallelitaet UEBER Quellen bleibt, weil
+        jede Quelle ihren eigenen Limiter (und damit ihre eigene Sperre) hat.
+        """
+        if source not in self._rate_limiters:
+            self._rate_limiters[source] = RateLimiter(
+                min_interval_seconds=self._rate_limits.get(source, 0.0)
+            )
+        return self._rate_limiters[source]
 
     async def search(
         self,
@@ -109,11 +155,21 @@ class AcademicSearchService(AsyncBaseSearchProvider):
     async def _search_arxiv(
         self, client: httpx.AsyncClient, query: str, max_results: int
     ) -> list[AcademicPaper]:
-        """arXiv XML API — no API key required."""
-        params = {"search_query": f"all:{query}", "start": 0, "max_results": min(max_results, 100)}
-        response = await client.get("https://export.arxiv.org/api/query", params=params)
-        if response.status_code == 429:
-            raise RateLimitError("arxiv", 429)
+        """arXiv XML API — no API key required.
+
+        Gedrosselt auf ``self._rate_limits["arxiv"]`` (Default 3.0s) — arXiv
+        beantwortet dichtere Anfragen mit 406, das die API-Terms als
+        "hoechstens 1 Anfrage / 3s" begruenden (writing-hub#1261 K2).
+        """
+        async with self._limiter("arxiv"):
+            params = {
+                "search_query": f"all:{query}",
+                "start": 0,
+                "max_results": min(max_results, 100),
+            }
+            response = await client.get("https://export.arxiv.org/api/query", params=params)
+        if response.status_code in (406, 429):
+            raise RateLimitError("arxiv", response.status_code)
         response.raise_for_status()
         return self._parse_arxiv_xml(response.text)
 
@@ -125,7 +181,12 @@ class AcademicSearchService(AsyncBaseSearchProvider):
     async def _search_semantic_scholar(
         self, client: httpx.AsyncClient, query: str, max_results: int
     ) -> list[AcademicPaper]:
-        """Semantic Scholar API — free, 100 req/5min."""
+        """Semantic Scholar API — free, 100 req/5min.
+
+        Gedrosselt auf ``self._rate_limits["semantic_scholar"]`` (Default
+        1.0s) — S2 antwortet auf parallele Anfragen mit 429, auch mit
+        Schluessel gilt ~1 Anfrage/Sekunde (writing-hub#1261 K2).
+        """
         params = {
             "query": query,
             "limit": min(max_results, 100),
@@ -134,11 +195,12 @@ class AcademicSearchService(AsyncBaseSearchProvider):
         headers: dict[str, str] = {}
         if self._s2_api_key:
             headers["x-api-key"] = self._s2_api_key
-        response = await client.get(
-            "https://api.semanticscholar.org/graph/v1/paper/search",
-            params=params,
-            headers=headers,
-        )
+        async with self._limiter("semantic_scholar"):
+            response = await client.get(
+                "https://api.semanticscholar.org/graph/v1/paper/search",
+                params=params,
+                headers=headers,
+            )
         if response.status_code == 429:
             raise RateLimitError("semantic_scholar", 429)
         response.raise_for_status()
@@ -152,24 +214,31 @@ class AcademicSearchService(AsyncBaseSearchProvider):
     async def _search_pubmed(
         self, client: httpx.AsyncClient, query: str, max_results: int
     ) -> list[AcademicPaper]:
-        """NCBI E-utilities — free, 3 req/sec without API key."""
-        r = await client.get(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-            params={
-                "db": "pubmed",
-                "term": query,
-                "retmax": min(max_results, 10000),
-                "retmode": "json",
-            },
-        )
+        """NCBI E-utilities — free, 3 req/sec without API key.
+
+        Zwei Anfragen (esearch, efetch) — beide gegen denselben Limiter
+        (``self._rate_limits["pubmed"]``, Default ~0.34s), damit auch der
+        zweite Request den Mindestabstand zum ersten einhaelt.
+        """
+        async with self._limiter("pubmed"):
+            r = await client.get(
+                "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+                params={
+                    "db": "pubmed",
+                    "term": query,
+                    "retmax": min(max_results, 10000),
+                    "retmode": "json",
+                },
+            )
         r.raise_for_status()
         ids = r.json().get("esearchresult", {}).get("idlist", [])[:max_results]
         if not ids:
             return []
-        r2 = await client.get(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
-            params={"db": "pubmed", "id": ",".join(ids), "retmode": "xml"},
-        )
+        async with self._limiter("pubmed"):
+            r2 = await client.get(
+                "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
+                params={"db": "pubmed", "id": ",".join(ids), "retmode": "xml"},
+            )
         r2.raise_for_status()
         return self._parse_pubmed_xml(r2.text)
 
@@ -181,15 +250,21 @@ class AcademicSearchService(AsyncBaseSearchProvider):
     async def _search_openalex(
         self, client: httpx.AsyncClient, query: str, max_results: int
     ) -> list[AcademicPaper]:
-        """OpenAlex API — free, 100k req/day."""
-        response = await client.get(
-            "https://api.openalex.org/works",
-            params={
-                "search": query,
-                "per_page": min(max_results, 50),
-                "mailto": "research@iil.pet",
-            },
-        )
+        """OpenAlex API — free, 100k req/day.
+
+        Gedrosselt auf ``self._rate_limits["openalex"]`` (Default 0.1s, laut
+        OpenAlex-Doku vertraegt der "polite pool" mit gesetztem ``mailto``
+        ~10 Anfragen/Sekunde).
+        """
+        async with self._limiter("openalex"):
+            response = await client.get(
+                "https://api.openalex.org/works",
+                params={
+                    "search": query,
+                    "per_page": min(max_results, 50),
+                    "mailto": "research@iil.pet",
+                },
+            )
         response.raise_for_status()
         return self._parse_openalex(response.json())
 

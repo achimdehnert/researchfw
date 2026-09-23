@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -85,6 +86,50 @@ _STYLE_INSTRUCTIONS: dict[str, str] = {
 }
 
 
+@dataclass(frozen=True)
+class SummaryPrompts:
+    """LLM-Prompt-Vorlagen fuer ``AISummaryService`` — per Instanz austauschbar.
+
+    Bis 2026-09-23 waren diese Prompts inline als f-Strings in den einzelnen
+    Methoden gebaut (writing-hub#1261 K2, ADR-204-Bruecke) — ein Konsument mit
+    eigener Prompt-Verwaltung (z.B. writing-hub/promptfw-Templates) konnte sie
+    nicht ersetzen, ohne den Quellcode zu patchen. Jetzt:
+    ``AISummaryService(llm_fn, prompts=SummaryPrompts(...))``.
+
+    Jede Vorlage wird mit ``str.format(**kwargs)`` gefuellt — die Platzhalter
+    MUESSEN erhalten bleiben, sonst wirft ``.format()`` einen ``KeyError``:
+
+    - ``findings_summary`` (``_llm_summarize``): ``{style_instruction}``,
+      ``{cite_instruction}``, ``{content}``
+    - ``sources_analysis`` (``summarize_sources``): ``{source_count}``,
+      ``{titles}``, ``{max_length}``
+    - ``key_points_extraction`` (``extract_key_points``): ``{max_points}``,
+      ``{text}``
+    - ``research_questions`` (``generate_research_questions``): ``{count}``,
+      ``{topic}``
+
+    Die Defaults sind byte-identisch mit dem bisherigen, inline gebauten Text
+    — ohne Injektion aendert sich nichts am erzeugten Prompt.
+    """
+
+    findings_summary: str = (
+        "{style_instruction}{cite_instruction}\n\nForschungsergebnisse (Grundlage):\n{content}"
+    )
+    sources_analysis: str = (
+        "Analyse the following {source_count} research sources thematically.\n"
+        "Sources: {titles}\n"
+        "Provide: main themes, key topics, research gaps in {max_length} words."
+    )
+    key_points_extraction: str = (
+        "Extract exactly {max_points} key points from the following text.\n"
+        "Format: one point per line, starting with '- '\n\n{text}"
+    )
+    research_questions: str = (
+        "Generate {count} specific research questions about: {topic}\n"
+        "Format: one question per line, starting with a question word."
+    )
+
+
 def make_together_llm(
     api_key: str | None = None,
     model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
@@ -132,8 +177,13 @@ class AISummaryService:
     Falls back to extractive summaries when llm_fn is None.
     """
 
-    def __init__(self, llm_fn: LLMCallable | None = None) -> None:
+    def __init__(
+        self,
+        llm_fn: LLMCallable | None = None,
+        prompts: SummaryPrompts | None = None,
+    ) -> None:
         self._llm_fn = llm_fn
+        self._prompts = prompts or SummaryPrompts()
 
     async def summarize_findings(
         self,
@@ -166,10 +216,10 @@ class AISummaryService:
             return {"summary": "", "themes": [], "ai_generated": False}
         if self._llm_fn:
             titles = [s.get("title", "") for s in sources[:20]]
-            prompt = (
-                f"Analyse the following {len(sources)} research sources thematically.\n"
-                f"Sources: {', '.join(titles)}\n"
-                f"Provide: main themes, key topics, research gaps in {max_length} words."
+            prompt = self._prompts.sources_analysis.format(
+                source_count=len(sources),
+                titles=", ".join(titles),
+                max_length=max_length,
             )
             text = await self._llm_fn(prompt, max_tokens=max_length * 2)
             return {"summary": text.strip(), "themes": [], "ai_generated": True}
@@ -182,9 +232,8 @@ class AISummaryService:
     async def extract_key_points(self, text: str, max_points: int = 5) -> list[str]:
         """Extract key points from text."""
         if self._llm_fn:
-            prompt = (
-                f"Extract exactly {max_points} key points from the following text.\n"
-                f"Format: one point per line, starting with '- '\n\n{text[:3000]}"
+            prompt = self._prompts.key_points_extraction.format(
+                max_points=max_points, text=text[:3000]
             )
             result = await self._llm_fn(prompt, max_tokens=300)
             points = [
@@ -197,10 +246,7 @@ class AISummaryService:
     async def generate_research_questions(self, topic: str, count: int = 5) -> list[str]:
         """Generate research questions for a topic."""
         if self._llm_fn:
-            prompt = (
-                f"Generate {count} specific research questions about: {topic}\n"
-                f"Format: one question per line, starting with a question word."
-            )
+            prompt = self._prompts.research_questions.format(count=count, topic=topic)
             result = await self._llm_fn(prompt, max_tokens=400)
             lines = [line.strip() for line in result.strip().splitlines() if line.strip()]
             return [line.lstrip("0123456789. ") for line in lines][:count]
@@ -229,8 +275,10 @@ class AISummaryService:
         content = "\n".join(
             f"- {f.get('title', '')}: {f.get('content', '')[:200]}" for f in findings[:20]
         )
-        prompt = (
-            f"{style_instruction}{cite_instruction}\n\nForschungsergebnisse (Grundlage):\n{content}"
+        prompt = self._prompts.findings_summary.format(
+            style_instruction=style_instruction,
+            cite_instruction=cite_instruction,
+            content=content,
         )
         summary = await self._llm_fn(prompt, max_tokens=max_length * 2)
         key_points = await self.extract_key_points(summary, max_points=5)

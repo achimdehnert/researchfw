@@ -20,7 +20,7 @@ Public API is organised by submodule — import from these directly:
 
 from importlib.metadata import PackageNotFoundError, version
 
-from iil_researchfw.analysis.summary import AISummaryService, make_together_llm
+from iil_researchfw.analysis.summary import AISummaryService, SummaryPrompts, make_together_llm
 from iil_researchfw.citations.formatter import (
     Author,
     Citation,
@@ -33,7 +33,12 @@ from iil_researchfw.core.service import ResearchService
 from iil_researchfw.export.service import ResearchExportService
 from iil_researchfw.search.academic import AcademicSearchService
 from iil_researchfw.search.brave import BraveSearchService
-from iil_researchfw.search.smart import ScoredPaper, SmartSearchResult, SmartSearchService
+from iil_researchfw.search.smart import (
+    ScoredPaper,
+    SmartSearchPrompts,
+    SmartSearchResult,
+    SmartSearchService,
+)
 
 try:
     __version__ = version("iil-researchfw")
@@ -55,9 +60,11 @@ __all__ = [
     "Author",
     "SourceType",
     "AISummaryService",
+    "SummaryPrompts",
     "make_together_llm",
     "ResearchExportService",
     "SmartSearchService",
+    "SmartSearchPrompts",
     "SmartSearchResult",
     "ScoredPaper",
 ]

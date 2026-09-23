@@ -13,8 +13,9 @@
 - **Citations**: APA, MLA, Chicago, Harvard, IEEE, Vancouver + BibTeX/RIS
 - **AI Summary**: LLM-agnostisch via `LLMCallable` Protocol
 - **Export**: Markdown, LaTeX, DOCX
-- **Rate Limiting**: Token-Bucket per API-Endpoint
+- **Rate Limiting**: Token-Bucket per API-Endpoint, **per Quelle konfigurierbar** (`AcademicSearchService(rate_limits={...})`, Defaults arXiv 3.0s / S2 1.0s / OpenAlex 0.1s / PubMed 0.34s — parallel über Quellen, seriell innerhalb einer Quelle, auch beim Retry)
 - **Retry**: `tenacity` Exponential Backoff
+- **Prompts injizierbar**: `SmartSearchService`/`AISummaryService` nehmen eigene `SmartSearchPrompts`/`SummaryPrompts` an (ADR-204-Brücke für Konsumenten mit eigener Prompt-Verwaltung)
 
 ## Installation
 
