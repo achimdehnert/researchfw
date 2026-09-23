@@ -64,6 +64,33 @@ REJECTED_BELOW_THRESHOLD = "below_threshold"
 REJECTED_OVER_MAX_RESULTS = "over_max_results"
 
 
+@dataclass(frozen=True)
+class SmartSearchPrompts:
+    """LLM-Prompt-Vorlagen fuer ``SmartSearchService`` — per Instanz austauschbar.
+
+    Bis 2026-09-23 waren die Prompts Modul-Konstanten (writing-hub#1261 K2,
+    ADR-204-Bruecke) — ein Konsument mit eigener Prompt-Verwaltung (z.B.
+    writing-hub/promptfw-Templates) konnte sie nicht ersetzen, ohne den
+    Quellcode zu patchen. Jetzt: ``SmartSearchService(..., prompts=SmartSearchPrompts(...))``.
+
+    Jede Vorlage wird mit ``str.format(**kwargs)`` gefuellt — die Platzhalter
+    MUESSEN erhalten bleiben, sonst wirft ``.format()`` einen ``KeyError``:
+
+    - ``query_expansion``: ``{topic}``, ``{max_queries}``
+    - ``gap_analysis``: ``{topic}``, ``{papers_summary}``, ``{max_queries}``
+    - ``relevance_scoring``: ``{topic}``, ``{papers_json}``
+
+    Die Defaults sind byte-identisch mit den bisherigen Modul-Konstanten
+    (``QUERY_EXPANSION_PROMPT`` / ``GAP_ANALYSIS_PROMPT`` /
+    ``RELEVANCE_SCORING_PROMPT``, unten weiterhin als Default-Quelle
+    exportiert) — ohne Injektion aendert sich nichts am erzeugten Prompt.
+    """
+
+    query_expansion: str = QUERY_EXPANSION_PROMPT
+    gap_analysis: str = GAP_ANALYSIS_PROMPT
+    relevance_scoring: str = RELEVANCE_SCORING_PROMPT
+
+
 @dataclass
 class ScoredPaper:
     """Academic paper with LLM-assigned relevance score."""
@@ -122,6 +149,7 @@ class SmartSearchService:
         scoring_batch_size: int = 10,
         expand_citations: bool = False,
         search_rounds: int = 1,
+        prompts: SmartSearchPrompts | None = None,
     ) -> None:
         self._llm_fn = llm_fn
         self._academic = academic_service or AcademicSearchService()
@@ -130,6 +158,7 @@ class SmartSearchService:
         self._scoring_batch_size = scoring_batch_size
         self._expand_citations = expand_citations
         self._search_rounds = max(1, min(search_rounds, 3))
+        self._prompts = prompts or SmartSearchPrompts()
 
     async def search(
         self,
@@ -273,7 +302,7 @@ class SmartSearchService:
 
     async def _expand_query(self, topic: str) -> list[str]:
         """Use LLM to generate optimized search queries from a topic."""
-        prompt = QUERY_EXPANSION_PROMPT.format(topic=topic, max_queries=self._max_queries)
+        prompt = self._prompts.query_expansion.format(topic=topic, max_queries=self._max_queries)
         try:
             response = await self._llm_fn(prompt, max_tokens=300)
             data = json.loads(self._extract_json(response))
@@ -313,7 +342,7 @@ class SmartSearchService:
             for idx, p in enumerate(papers)
         ]
 
-        prompt = RELEVANCE_SCORING_PROMPT.format(
+        prompt = self._prompts.relevance_scoring.format(
             topic=topic,
             papers_json=json.dumps(papers_for_prompt, ensure_ascii=False, indent=2),
         )
@@ -349,7 +378,7 @@ class SmartSearchService:
         papers_summary = "\n".join(
             f"- {sp.paper.title} (score: {sp.relevance_score})" for sp in current_papers[:15]
         )
-        prompt = GAP_ANALYSIS_PROMPT.format(
+        prompt = self._prompts.gap_analysis.format(
             topic=topic,
             papers_summary=papers_summary,
             max_queries=self._max_queries,

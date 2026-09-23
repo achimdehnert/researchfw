@@ -5,6 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.0] — 2026-09-23
+
+### Added
+- **Per-Quellen-Drossel in `AcademicSearchService`** (writing-hub#1261 K2):
+  arXiv antwortete im Konsumenten writing-hub mit 406 auf parallele
+  Mehrwort-Anfragen (36 Fehlschlaege in einem Lauf), Semantic Scholar mit 429
+  — beide erlauben nur einen begrenzten Mindestabstand zwischen Anfragen
+  (arXiv laut API-Terms 3s, S2 ~1s auch mit Schluessel). Neuer Konstruktor-
+  Parameter `rate_limits: dict[str, float] | None` (Default: arXiv 3.0s, S2
+  1.0s, OpenAlex 0.1s, PubMed 0.34s — aus deren jeweiliger Doku, sonst 0.0
+  ungedrosselt); je Quelle ein eigener `RateLimiter` (Lock + Mindestabstand),
+  sodass Parallelitaet UEBER Quellen erhalten bleibt, INNERHALB einer Quelle
+  aber seriell gedrosselt wird — auch beim Retry, statt sich nur auf den
+  exponentiellen tenacity-Backoff zu verlassen.
+  - `WIEDERHOLBAR` behandelt 406 jetzt wie 429 (`RateLimitError` vor
+    `raise_for_status()`, statt sich auf das implizite `HTTPStatusError` zu
+    verlassen) — arXiv beantwortete dieselbe Anfrage Minuten spaeter mit 200.
+  - `_internal.rate_limiter.RateLimiter` akzeptiert jetzt wahlweise
+    `min_interval_seconds` direkt (statt nur `calls_per_second`).
+- **Prompts injizierbar** (writing-hub#1261 K2, ADR-204-Bruecke): Konsumenten
+  mit eigener Prompt-Verwaltung (z.B. writing-hub/promptfw-Templates) konnten
+  die LLM-Prompts bisher nicht ersetzen, ohne den Quellcode zu patchen.
+  - `SmartSearchService(..., prompts: SmartSearchPrompts | None = None)` —
+    `SmartSearchPrompts(query_expansion, gap_analysis, relevance_scoring)`,
+    Default byte-identisch mit den bisherigen Modul-Konstanten.
+  - `AISummaryService(..., prompts: SummaryPrompts | None = None)` —
+    `SummaryPrompts(findings_summary, sources_analysis, key_points_extraction,
+    research_questions)`, Default byte-identisch mit dem bisherigen, inline
+    gebauten Text.
+- 9 neue Tests (`test_academic_rate_limit.py`, `test_prompt_injection.py`):
+  Mindestabstand durchgesetzt, Quellen drosseln unabhaengig, 406 wird
+  wiederholt, Default-Prompts byte-identisch (Snapshot), Injektion wirkt.
+
+### Compatibility
+- Rein additiv. Alle neuen Konstruktor-Parameter sind optional mit
+  Default-Verhalten identisch zum Stand vor 0.7.0; Bestandscode laeuft
+  unveraendert.
+
+---
+
 ## [0.6.2] — 2026-08-07
 
 ### Added
